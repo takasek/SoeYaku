@@ -50,4 +50,6 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s Tests/AdapterTests -v
 
 単体・HTTP テスト17件に加え、変更していない Kikiyaku の `OpenAICompatSession` と実モデルで、用語集の有無、履歴ありの英→日、日→英を確認しました。別途36秒の公開講演をシステム音声から認識して字幕窓へ表示し、5発話に登録語が現れることと、資料訳との共有語2語の一致を確認しました。[検証記録](../docs/validation/kikiyaku-glossary-demo-2026-11-06.md)に条件と制約を記録しています。
 
+さらに[固定入力の対照比較](../docs/validation/glossary-controls-2026-11-07.md)で、用語がモデルへ届く効果と、届いた指定をモデルが採用するかを分けました。識別用の訳語は6条件中3条件で不採用となり、公式の構造化入力・同一要求の直送でも同じ結果でした。通常の「標準出力」は指定なしでも出るため、その一致を用語集の効果には数えていません。句単位の保護指定を加えた別条件では、パッケージ名や型名を保ったまま一般名詞を指定訳にできることを確認しています。
+
 既定プロンプトの出典・ライセンスは [Kikiyaku-NOTICE.txt](Kikiyaku-NOTICE.txt) を参照してください。
