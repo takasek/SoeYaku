@@ -9,8 +9,10 @@ let package = Package(
     ],
     targets: [
         .target(name: "SoeYakuCore"),
+        .target(name: "SoeYakuVision", dependencies: ["SoeYakuCore"]),
         .target(name: "SoeYakuRuntime"),
         .testTarget(name: "SoeYakuCoreTests", dependencies: ["SoeYakuCore"]),
+        .testTarget(name: "SoeYakuVisionTests", dependencies: ["SoeYakuVision", "SoeYakuCore"]),
         .testTarget(name: "SoeYakuRuntimeTests", dependencies: ["SoeYakuRuntime"])
     ]
 )
