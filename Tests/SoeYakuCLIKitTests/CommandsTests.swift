@@ -27,6 +27,21 @@ private func withFixture<T>(_ body: (URL) async throws -> T) async throws -> T {
 }
 
 struct CommandsTests {
+    @Test func htmlExtractionAndTranslationShareTheDocumentPathAndSavedMemory() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("soeyaku-cli-html-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let html = directory.appendingPathComponent("notes.html"), memory = directory.appendingPathComponent("memory.json")
+        try Data("<html><title>Notes</title><main><h1>Heading</h1><p>An HTML sentence.</p></main></html>".utf8).write(to: html)
+        let extracted = try CLI.extractLines(file: html)
+        #expect(extracted == [#"{"id":0,"paragraph":0,"page":0,"text":"Heading"}"#, #"{"id":1,"paragraph":1,"page":0,"text":"An HTML sentence."}"#])
+        let options = TranslateOptions(file: html.path, port: 1, memory: memory.path, model: "html-fixture")
+        let translated = try await CLI.translateLines(options, translator: FakeTranslator(), progress: { _ in })
+        #expect(try object(translated[1])["ja"] as? String == "訳:An HTML sentence.")
+        let reused = try await CLI.translateLines(options, translator: RefusingTranslator(), progress: { _ in })
+        #expect(reused == translated)
+    }
+
     @Test func aModelFileSharesTheAppsContentKeyAndReplacementDoesNotReuseIt() async throws {
         let pdf = try MainFixture.write(rightColumnFirst: false)
         let directory = pdf.deletingLastPathComponent()

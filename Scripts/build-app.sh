@@ -17,6 +17,8 @@ stage=$(mktemp -d "$PWD/dist/build.XXXXXX")
 trap 'rm -rf "$stage"' EXIT
 app="$stage/SoeYaku.app"
 mkdir -p "$app/Contents/"{MacOS,Resources,Helpers}
+mkdir -p "$app/Contents/Resources/ThirdPartyNotices"
+cp App/ThirdPartyNotices/SwiftSoup.txt "$app/Contents/Resources/ThirdPartyNotices/"
 cp App/Info.plist "$app/Contents/"
 cp "$bin/SoeYaku" "$app/Contents/MacOS/"
 swiftc -O -target "$(uname -m)-apple-macosx26.0" Scripts/start-model.swift -o "$app/Contents/Helpers/start-model"

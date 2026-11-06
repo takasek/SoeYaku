@@ -9,8 +9,11 @@ let package = Package(
         .executable(name: "SoeYaku", targets: ["SoeYakuApp"]),
         .executable(name: "soeyaku-cli", targets: ["SoeYakuCLI"])
     ],
+    dependencies: [
+        .package(url: "https://github.com/scinfu/SwiftSoup.git", exact: "2.14.3")
+    ],
     targets: [
-        .target(name: "SoeYakuCore"),
+        .target(name: "SoeYakuCore", dependencies: [.product(name: "SwiftSoup", package: "SwiftSoup")]),
         .target(name: "SoeYakuVision", dependencies: ["SoeYakuCore"]),
         .target(name: "SoeYakuRuntime"),
         .target(name: "SoeYakuCLIKit", dependencies: ["SoeYakuCore", "SoeYakuVision"]),

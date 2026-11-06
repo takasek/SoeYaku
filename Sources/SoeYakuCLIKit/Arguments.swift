@@ -38,9 +38,9 @@ public enum Command: Equatable, Sendable {
 
     public static let usage = """
         使い方:
-          soeyaku-cli extract FILE.pdf
-          soeyaku-cli translate FILE.pdf --port N [--api-key K] [--glossary FILE]... [--memory FILE] [--model-file FILE.gguf | --model VERSION]
-          soeyaku-cli locate FILE.pdf IMAGE.png --pointer X,Y
+          soeyaku-cli extract FILE.pdf|FILE.html
+          soeyaku-cli translate FILE.pdf|FILE.html --port N [--api-key K] [--glossary FILE]... [--memory FILE] [--model-file FILE.gguf | --model VERSION]
+          soeyaku-cli locate FILE.pdf|FILE.html IMAGE.png --pointer X,Y
         """
 
     public static func parse(_ arguments: [String]) throws -> Command {
@@ -48,10 +48,10 @@ public enum Command: Equatable, Sendable {
         switch name {
         case "extract":
             let (positional, _) = try split(arguments.dropFirst(), valued: [])
-            return .extract(file: try one(positional, "extract は FILE.pdf を 1 つ取ります。"))
+            return .extract(file: try one(positional, "extract は PDF・HTML ファイルを 1 つ取ります。"))
         case "translate":
             let (positional, options) = try split(arguments.dropFirst(), valued: ["--port", "--api-key", "--glossary", "--memory", "--model", "--model-file"])
-            let file = try one(positional, "translate は FILE.pdf を 1 つ取ります。")
+            let file = try one(positional, "translate は PDF・HTML ファイルを 1 つ取ります。")
             guard let portText = options.first(where: { $0.name == "--port" })?.value else {
                 throw UsageError("--port を指定してください。")
             }
@@ -69,7 +69,7 @@ public enum Command: Equatable, Sendable {
                     memory: last("--memory"), model: last("--model"), modelFile: last("--model-file")))
         case "locate":
             let (positional, options) = try split(arguments.dropFirst(), valued: ["--pointer"])
-            guard positional.count == 2 else { throw UsageError("locate は FILE.pdf と IMAGE.png を取ります。") }
+            guard positional.count == 2 else { throw UsageError("locate は PDF・HTML ファイルと IMAGE.png を取ります。") }
             guard let text = options.last(where: { $0.name == "--pointer" })?.value else {
                 throw UsageError("--pointer X,Y を指定してください。")
             }

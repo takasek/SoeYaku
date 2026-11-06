@@ -19,7 +19,7 @@ public enum CLI {
     public static let defaultModel = "plamo-3-translate-2b-Q4_K_M.gguf"
 
     public static func extractLines(file: URL) throws -> [String] {
-        try PDFExtractor.extract(url: file).sentences.map {
+        try SourceDocumentLoader.extractFile(file).sentences.map {
             jsonLine([("id", $0.id), ("paragraph", $0.paragraph), ("page", $0.page), ("text", $0.text)])
         }
     }
@@ -36,7 +36,7 @@ public enum CLI {
         _ options: TranslateOptions, translator: some SentenceTranslator,
         progress: @Sendable (TranslationProgress) async -> Void
     ) async throws -> [String] {
-        let document = try PDFExtractor.extract(url: URL(fileURLWithPath: options.file))
+        let document = try SourceDocumentLoader.extractFile(URL(fileURLWithPath: options.file))
         let files = glossaryFiles(given: options.glossaries, fingerprint: document.fingerprint) {
             FileManager.default.fileExists(atPath: $0.path)
         }
@@ -60,7 +60,7 @@ public enum CLI {
 
     /// Recognizes the text in `image`, finds the sentence under `pointer` (image pixels, top-left origin) and returns one JSON line.
     public static func locateLine(file: URL, image: URL, pointer: CGPoint) async throws -> String {
-        let document = try PDFExtractor.extract(url: file)
+        let document = try SourceDocumentLoader.extractFile(file)
         guard let source = CGImageSourceCreateWithURL(image as CFURL, nil),
               let picture = CGImageSourceCreateImageAtIndex(source, 0, nil), picture.width > 0, picture.height > 0
         else { throw CLIError.unreadableImage(image.path) }
