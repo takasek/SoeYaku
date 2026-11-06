@@ -37,7 +37,7 @@ private func mainFixture(rightColumnFirst: Bool, title: String? = "Fixture Title
     let page1 = running(1) + [titleBlock] + (rightColumnFirst ? [right, left] : [left, right])
     let page2 =
         running(2) + [
-            Block(text: "visible in the preview application.", rect: CGRect(x: 72, y: 690, width: 468, height: 20)),
+            Block(text: "visible in the preview application. Scrolling the document moves the highlight.", rect: CGRect(x: 72, y: 690, width: 468, height: 20)),
             Block(text: "Results", rect: CGRect(x: 72, y: 650, width: 468, height: 28), fontSize: 16),
             Block(
                 text: "The system translated every sentence in the test document. "
@@ -73,12 +73,13 @@ private func rows(_ document: SourceDocument) -> [String] {
                 "5|1|0|Therefore the whole document is translated before reading begins.",
                 "6|1|0|Each sentence is shown beside its source so that the reader can check the meaning quickly.",
                 "7|1|0|The window follows the position of the reader and highlights the sentence that is currently visible in the preview application.",
-                "8|2|1|Results",
-                "9|3|1|The system translated every sentence in the test document.",
-                "10|3|1|Most sentences were translated correctly with an efficient model.",
-                "11|3|1|Nothing was lost between the pages.",
-                "12|4|2|This short page closes the example.",
-                "13|4|2|It has only one paragraph with two sentences.",
+                "8|1|1|Scrolling the document moves the highlight.",
+                "9|2|1|Results",
+                "10|3|1|The system translated every sentence in the test document.",
+                "11|3|1|Most sentences were translated correctly with an efficient model.",
+                "12|3|1|Nothing was lost between the pages.",
+                "13|4|2|This short page closes the example.",
+                "14|4|2|It has only one paragraph with two sentences.",
             ])
     }
 

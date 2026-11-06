@@ -101,7 +101,7 @@ enum ReadingOrder {
     ///
     /// A line change that crosses a column or a page, or that changes the line height, is judged by the
     /// sentence-end rule instead of the vertical-gap and indent rules, which only make sense inside one column.
-    static func paragraphs(_ flow: [PageLine], pageBounds: [CGRect]) -> [(page: Int, text: String)] {
+    static func paragraphs(_ flow: [PageLine], pageBounds: [CGRect]) -> [Paragraph] {
         // A column is a left or right column of a two-column page, or the whole page otherwise.
         var keys: [ColumnKey] = []
         var widest: [ColumnKey: CGFloat] = [:]
@@ -119,21 +119,41 @@ enum ReadingOrder {
             leftEdge[key] = min(leftEdge[key] ?? .infinity, line.bounds.minX)
         }
 
-        var result: [(page: Int, text: String)] = []
+        // Full-width lines on a two-column page are measured against the whole text block, not against each other.
+        for key in widest.keys where key.column == .full {
+            let lines = pages[key.page] ?? []
+            widest[key] = (lines.map(\.bounds.maxX).max() ?? 0) - (lines.map(\.bounds.minX).min() ?? 0)
+        }
+
+        var result: [Paragraph] = []
         for (index, line) in flow.enumerated() {
             let text = line.text.trimmingCharacters(in: .whitespaces)
-            guard index > 0 else {
-                result.append((line.page, text))
-                continue
-            }
-            let previous = flow[index - 1]
-            if startsParagraph(line, after: previous, key: keys[index], previousKey: keys[index - 1], widest: widest, leftEdge: leftEdge) {
-                result.append((line.page, text))
+            if index > 0,
+                !startsParagraph(
+                    line, after: flow[index - 1], key: keys[index], previousKey: keys[index - 1], widest: widest, leftEdge: leftEdge)
+            {
+                var paragraph = result[result.count - 1]
+                paragraph.text = join(paragraph.text, text)
+                paragraph.lineStarts.append((paragraph.text.count - text.count, line.page))
+                result[result.count - 1] = paragraph
             } else {
-                result[result.count - 1].text = join(result[result.count - 1].text, text)
+                result.append(Paragraph(page: line.page, text: text, lineStarts: [(0, line.page)]))
             }
         }
         return result
+    }
+
+    /// Text of one paragraph with the page of every line in it.
+    struct Paragraph {
+        let page: Int
+        var text: String
+        /// Character offset in `text` at which each line starts, with the page of that line.
+        var lineStarts: [(offset: Int, page: Int)]
+
+        /// The page of the line that contains the character at `offset`.
+        func page(atOffset offset: Int) -> Int {
+            lineStarts.last { $0.offset <= offset }?.page ?? page
+        }
     }
 
     private static func startsParagraph(
@@ -141,7 +161,9 @@ enum ReadingOrder {
         widest: [ColumnKey: CGFloat], leftEdge: [ColumnKey: CGFloat]
     ) -> Bool {
         let height = previous.bounds.height
-        if abs(line.bounds.height - height) > 0.25 * height { return true }
+        let endsLine = endsSentence(previous.text) || previous.bounds.width < 0.8 * (widest[previousKey] ?? 0)
+        // A taller or smaller line inside a sentence (superscript, inline math) must not split it.
+        if abs(line.bounds.height - height) > 0.25 * height && endsLine { return true }
         if key == previousKey {
             if previous.bounds.minY - line.bounds.maxY > 0.8 * height { return true }
             return endsSentence(previous.text) && line.bounds.minX - (leftEdge[key] ?? line.bounds.minX) > 0.5 * height
@@ -159,12 +181,21 @@ enum ReadingOrder {
     }
 
     static func sentences(_ paragraph: String) -> [String] {
+        sentenceSpans(paragraph).map(\.text)
+    }
+
+    /// Sentences with the character offset at which each one (after trimming) starts in `paragraph`.
+    static func sentenceSpans(_ paragraph: String) -> [(text: String, offset: Int)] {
         let tokenizer = NLTokenizer(unit: .sentence)
         tokenizer.string = paragraph
-        var result: [String] = []
+        var result: [(text: String, offset: Int)] = []
         tokenizer.enumerateTokens(in: paragraph.startIndex..<paragraph.endIndex) { range, _ in
-            let sentence = paragraph[range].trimmingCharacters(in: .whitespacesAndNewlines)
-            if !sentence.isEmpty { result.append(sentence) }
+            let raw = paragraph[range]
+            let sentence = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !sentence.isEmpty {
+                let start = raw.firstIndex { !$0.isWhitespace } ?? range.lowerBound
+                result.append((sentence, paragraph.distance(from: paragraph.startIndex, to: start)))
+            }
             return true
         }
         return result

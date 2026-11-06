@@ -40,10 +40,12 @@ public enum PDFExtractor {
         var sentences: [Sentence] = []
         var paragraphIndex = 0
         for paragraph in ReadingOrder.paragraphs(flow, pageBounds: bounds) {
-            let parts = ReadingOrder.sentences(paragraph.text)
+            let parts = ReadingOrder.sentenceSpans(paragraph.text)
             guard !parts.isEmpty else { continue }
             for part in parts {
-                sentences.append(Sentence(id: sentences.count, paragraph: paragraphIndex, page: paragraph.page, text: part))
+                sentences.append(
+                    Sentence(
+                        id: sentences.count, paragraph: paragraphIndex, page: paragraph.page(atOffset: part.offset), text: part.text))
             }
             paragraphIndex += 1
         }

@@ -161,6 +161,47 @@ func line(_ text: String, x: CGFloat, top: CGFloat, width: CGFloat = 200, height
         let result = ReadingOrder.paragraphs(flow, pageBounds: [letter, letter])
         #expect(result.map(\.page) == [0])
     }
+
+    @Test func lineHeightChangeInsideAnUnfinishedParagraphDoesNotBreak() {
+        // A superscript citation or inline math makes one line taller; no line ends a sentence.
+        let flow = [
+            line("the model reaches", x: 72, top: 700, width: 468),
+            line("a score of 3 with citation", x: 72, top: 686, width: 468, height: 16),
+            line("and then continues", x: 72, top: 668, width: 468),
+        ]
+        #expect(paragraphs(flow) == ["the model reaches a score of 3 with citation and then continues"])
+    }
+
+    @Test func lineHeightChangeAfterAFullLineThatEndsASentenceBreaks() {
+        let flow = [
+            line("A body line.", x: 72, top: 700, width: 468),
+            line("Heading", x: 72, top: 684, width: 468, height: 16),
+        ]
+        #expect(paragraphs(flow) == ["A body line.", "Heading"])
+    }
+
+    @Test func eachSentenceOffsetMapsToThePageOfItsLine() {
+        // Offsets are character offsets into the joined text; the dehyphenated join must keep them consistent.
+        let flow =
+            body(["Alpha beta gam-", "ma. Delta epsilon"]) + body(["zeta. Eta theta."], top: 700, page: 1)
+        let result = ReadingOrder.paragraphs(flow, pageBounds: [letter, letter])
+        #expect(result.count == 1)
+        let paragraph = result[0]
+        #expect(paragraph.text == "Alpha beta gamma. Delta epsilon zeta. Eta theta.")
+        func page(of sentence: String) -> Int? {
+            paragraph.text.range(of: sentence).map { paragraph.page(atOffset: paragraph.text.distance(from: paragraph.text.startIndex, to: $0.lowerBound)) }
+        }
+        #expect(page(of: "Alpha") == 0)
+        #expect(page(of: "Delta") == 0)
+        #expect(page(of: "zeta") == 1)
+        #expect(page(of: "Eta") == 1)
+    }
+
+    @Test func sentenceSpansReportCharacterOffsets() {
+        let spans = ReadingOrder.sentenceSpans("  One two.  Three four.")
+        #expect(spans.map(\.text) == ["One two.", "Three four."])
+        #expect(spans.map(\.offset) == [2, 12])
+    }
 }
 
 @Suite struct SentenceTests {
