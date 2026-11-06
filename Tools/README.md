@@ -48,6 +48,6 @@ Kikiyaku のプロファイルで次を指定します。
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s Tests/AdapterTests -v
 ```
 
-単体・HTTP テスト17件に加え、変更していない Kikiyaku の `OpenAICompatSession` と実モデルで、用語集の有無、履歴ありの英→日、日→英を確認しました。音声認識から字幕表示までの確認とは区別します。[検証記録](../docs/validation/kikiyaku-glossary-demo-2026-11-06.md)に結果と残件を記録しています。
+単体・HTTP テスト17件に加え、変更していない Kikiyaku の `OpenAICompatSession` と実モデルで、用語集の有無、履歴ありの英→日、日→英を確認しました。別途36秒の公開講演をシステム音声から認識して字幕窓へ表示し、5発話に登録語が現れることと、資料訳との共有語2語の一致を確認しました。[検証記録](../docs/validation/kikiyaku-glossary-demo-2026-11-06.md)に条件と制約を記録しています。
 
 既定プロンプトの出典・ライセンスは [Kikiyaku-NOTICE.txt](Kikiyaku-NOTICE.txt) を参照してください。
