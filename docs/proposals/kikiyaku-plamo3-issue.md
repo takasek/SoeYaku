@@ -1,50 +1,61 @@
-# PLaMo 3 Translate に翻訳方向と用語集を構造化して渡す対応の相談
+# PLaMo 3 Translateで翻訳方向と用語集を反映する方法の相談
 
-ローカルの PLaMo 3 Translate 2B を Kikiyaku から使う場合、翻訳方向と用語集をモデル専用の構造化指定へ渡す対応について相談したいです。既定の OpenAI 互換要求では、これらを含むシステム指示がモデルのテンプレートで除外されることを、入力と出力の両方で確認しました。
+Kikiyakuのプロファイルで選んだ翻訳方向と用語集を、ローカルのPLaMo 3 Translateへ反映する方法を相談したいです。サーバー側の設定だけでプロファイルの変更にも追従できるなら、その方法を教えていただけますか。Kikiyaku側の対応が必要なら、PLaMo向けの送信方法を選べる対応を検討する余地があるでしょうか。
 
-## 確認条件
+llama.cppのllama-serverで、PLaMo 3 Translate 2BのGGUFと配布元のテンプレートを使って調べたところ、現在の要求では設定がモデルへ届かず、渡し方を変えると反映されることを確認しました。
 
-- Kikiyaku: `8dcc192421937bf0fd632809f53899319b65eb37`。アプリのソースは未変更です。
-- Apple Silicon M5、macOS 27.2、llama.cpp build 11960 (`8642541b2`)。
-- PLaMo 3 Translate 2B Q4_K_M GGUF と[配布元の固定版テンプレート](https://huggingface.co/pfnet/plamo-3-translate-2b-GGUF/blob/f2b4599dff9b3e45c62567eac15e83186b4cb64e/chat_template.jinja)。再取得したテンプレートは試験時のファイルとバイト一致しています。
-- Kikiyaku の既定プロンプト、`source` / `target` 付き発話タグ、[既存の用語集形式](https://github.com/utahta/kikiyaku/blob/8dcc192421937bf0fd632809f53899319b65eb37/Sources/kikiyaku/TranslationPrompt.swift)を使用。
+## 現在の要求と、動作を確認した要求の違い
 
-## 用語集を変えてもモデル入力が同じになる
+Kikiyakuは翻訳方向を `<u source="…" target="…">` タグに、用語集をsystemメッセージに載せています。PLaMoの配布元テンプレートは先頭のsystemメッセージを除外し、発話タグも翻訳する本文として扱うため、これらがモデル用の言語指定・用語指定にはなっていませんでした。
 
-`standard output` を含む同じ英文について、用語集なし／「標準出力」／識別用の「標準出力ストリーム」／識別用の「stdout」の4条件を送り、llama.cpp の `/apply-template` で実際の入力を確認しました。4条件の結果は全文一致し、PFMLのglossaryブロックがありませんでした。
+こちらで動作を確認したのは、llama-serverの `/v1/chat/completions` へ、タグを外した原文と、言語・用語をllama.cppの追加パラメータ `chat_template_kwargs` で渡す形です。次は実際に比較したリクエストから、モデル名と生成設定を省いた例です。
 
-別途、保存済み認識原文・公式字幕原文・資料の文を固定した72条件を、実際の `OpenAICompatSession` の新規セッションで比較しました。通常の用語集なし／ありの11組も、既存接続の出力は11/11で同一でした。
+```json
+{
+  "messages": [{
+    "role": "user",
+    "content": "This returns an ExecutionResult containing the process identifier, termination status, and collected standard output and standard error."
+  }],
+  "chat_template_kwargs": {
+    "source_lang": "en",
+    "target_lang": "ja",
+    "glossary": [{
+      "source": "standard output",
+      "target": "標準出力ストリーム"
+    }]
+  }
+}
+```
 
-同じモデルへ用語と言語をPFMLで渡すローカル補助を挟んだ場合、例えば次の同一入力で差が出ます。
+この指定は、llama-serverがPLaMo専用の入力書式（PFML）へ変換します。検証では、Kikiyakuの要求をPFMLへ変換して `/completion` に送る補助も作り、同じモデルで両方の入力・出力が一致することを確かめました。
+
+## 同じ入力で起きた違い
+
+以下の「標準接続」は既存のOpenAI互換接続、「変換補助あり」はKikiyakuと同じサーバーの間に上記の補助を挟んだ接続です。Kikiyaku本体のソースは変更していません。
+
+| 設定した内容 | 標準接続 | 変換補助あり |
+| --- | --- | --- |
+| `subprocess = 子プロセス`、`executable = 実行プログラム` | サブプロセス、実行ファイル | 子プロセス、実行プログラム |
+| 日→英で「水曜日の会議は中止です。」を翻訳 | 水曜日の会議は中止です。 | Wednesday's meeting is cancelled. |
+
+最初の行は、次の同じ原文で比較しました。変換補助ありでも用語集を外すと「サブプロセス」「実行ファイル」に戻るため、接続を変えただけの差とも区別しています。
 
 > In most cases, you’ll launch a subprocess using a FilePath to specify the full path to an executable.
 
-| 指定 | 構造化して渡したときの訳語 |
-| --- | --- |
-| 用語集なし | サブプロセス、実行ファイル |
-| `subprocess = 子プロセス`、`executable = 実行プログラム` | 子プロセス、実行プログラム |
+指定を届けた後も、モデルが採用しない例はありました。「標準出力」は指定なしでも出るため効果の証拠にせず、「標準出力ストリーム」「stdout」という識別用指定を同じ3入力で試すと、標準接続は0/6、変換補助ありは3/6の採用でした。採用されなかった3条件は、同じ要求をモデルへ直送しても再現しています。今回の相談では、この生成結果と、設定自体が入力から消える問題を分けています。
 
-## 翻訳方向も同じ入力で比較
+<details>
+<summary>再現環境と、追加で確認したこと</summary>
 
-| 同じ原文と指定方向 | 既存接続 | 構造化した経路 |
-| --- | --- | --- |
-| 水曜日の会議は中止です。／日→英 | 水曜日の会議は中止です。 | Wednesday's meeting is cancelled. |
-| 子プロセスを起動します。／日→英 | 子プロセスを起動します。 | Launch a subprocess. |
+- Kikiyaku: `8dcc192421937bf0fd632809f53899319b65eb37`。既定プロンプトと[既存の用語集形式](https://github.com/utahta/kikiyaku/blob/8dcc192421937bf0fd632809f53899319b65eb37/Sources/kikiyaku/TranslationPrompt.swift)を使用。
+- Apple Silicon M5、macOS 27.2、llama.cpp build 11960 (`8642541b2`)。
+- PLaMo 3 Translate 2B Q4_K_M GGUFと[配布元の固定版テンプレート](https://huggingface.co/pfnet/plamo-3-translate-2b-GGUF/blob/f2b4599dff9b3e45c62567eac15e83186b4cb64e/chat_template.jinja)。テンプレートは再取得して試験時のファイルとのバイト一致を確認。
+- `chat_template_kwargs` の仕様は [llama.cppのサーバー文書](https://github.com/ggml-org/llama.cpp/blob/b11960/tools/server/README.md)を参照。
 
-## 接続の欠落とモデルの指定無視を分けた確認
+標準接続では、代表入力の用語集を4通りに変えても、`/apply-template` が返すモデル入力は同じで、用語指定のブロックがありませんでした。固定した原文の辞書なし／ありの11組でも、訳文が変わりませんでした。これは指定が反映されないことを確かめる比較です。
 
-「標準出力」は指定なしでも出るため、用語集の効果の証拠には数えませんでした。同じ3入力に「標準出力ストリーム」「stdout」を指定した6条件では、既存接続は0/6、正しく構造化した経路は3/6で指定訳を採用しました。
+識別用指定の6条件では、上記の構造化指定から得たPFMLと、補助が実送信したPFMLがすべて一致しました。補助経由・モデル直送・構造化したchat接続の訳文も条件ごとに一致し、失敗3条件も同じままでした。これは失敗が補助による変換や出力加工で生じたものかを切り分ける比較です。
 
-この6条件では、公式テンプレートへタグなし原文と `chat_template_kwargs` の `source_lang` / `target_lang` / `glossary` を渡したPFMLと、補助の実送信PFMLが6/6で全文一致しました。補助経由、同一要求のモデル直送、正しい構造化指定のchat接続の出力も6/6で一致し、未採用の3条件も同じまま再現しました。したがって、モデルが指定を採用しない現象は別にありますが、システム指示のままでは指定自体が入力から消えることは切り分けられています。
+実利用の確認では、**Kikiyaku本体＋変換補助**で[WWDC2025の講演](https://developer.apple.com/videos/play/wwdc2025/245/)36秒の5発話を字幕表示しました。別途、関連資料8文をSoeYakuで訳し、「子プロセス」「標準出力」が両方に現れることを確認しています。この記録は字幕と資料訳を併用できることの確認で、用語集の効果は上の固定入力の比較で調べました。
 
-## 実字幕と資料での利用
-
-[WWDC2025「What’s New in Swift」](https://developer.apple.com/videos/play/wwdc2025/245/)の36秒を通常のKikiyakuで認識・翻訳・字幕表示し、関連するSwift Subprocess READMEの8文を文書読書用のローカルツール SoeYaku で訳しました。両方で「子プロセス」「標準出力」が現れました。
-
-実字幕の5発話を同じ発話順で履歴を引き継ぎつつ固定テキストとして再生すると、補助＋元の用語集の5訳は保存された実字幕と5/5で全文一致しました。同じ条件の辞書なし再生では一般名詞が「サブプロセス」「実行ファイル」になり、既存接続は辞書の有無で5/5同じ訳でした。各群はその群の訳を履歴に使うので、発話列全体への設定の効果として比較しています。個別入力への直接効果は、履歴なしの対照比較で確認しています。
-
-## 相談したい対応
-
-PLaMo 3 Translate 向けに、発話のsource / target、該当する用語、同じ方向の直近対訳を構造化して渡す対応は、プロジェクトの方針に合いそうでしょうか。
-
-今回、PFMLを `/completion` へ渡す方法に加え、[llama.cpp の `chat_template_kwargs`](https://github.com/ggml-org/llama.cpp/blob/b11960/tools/server/README.md) を正しく使うchat接続でも同じ入力と出力になることを確認しました。既存HTTP接続を活かす方法か、`LLMTranslator` に専用の翻訳器を加える方法かを含め、対応方針をご相談できればと思います。
+</details>
