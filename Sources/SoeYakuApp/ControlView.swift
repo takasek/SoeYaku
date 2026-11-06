@@ -41,7 +41,7 @@ struct ControlView: View {
                         Spacer()
                         Text(reader.model?.lastPathComponent ?? "モデル未選択").lineLimit(1).truncationMode(.middle)
                             .foregroundStyle(.secondary)
-                        Button("モデル…") { reader.chooseModel() }.disabled(reader.translating)
+                        Button("モデル…") { reader.chooseModel() }.disabled(reader.translating || reader.loading)
                     }
                     if let progress = reader.progress {
                         ProgressView(value: Double(progress.done + progress.failed), total: Double(max(progress.total, 1)))

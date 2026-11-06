@@ -20,6 +20,7 @@ let package = Package(
         .testTarget(name: "SoeYakuCoreTests", dependencies: ["SoeYakuCore", "SoeYakuTestSupport"]),
         .testTarget(name: "SoeYakuVisionTests", dependencies: ["SoeYakuVision", "SoeYakuCore", "SoeYakuTestSupport"]),
         .testTarget(name: "SoeYakuCLIKitTests", dependencies: ["SoeYakuCLIKit", "SoeYakuCore", "SoeYakuTestSupport"]),
-        .testTarget(name: "SoeYakuRuntimeTests", dependencies: ["SoeYakuRuntime"])
+        .testTarget(name: "SoeYakuRuntimeTests", dependencies: ["SoeYakuRuntime"]),
+        .testTarget(name: "SoeYakuAppTests", dependencies: ["SoeYakuApp", "SoeYakuCore"])
     ]
 )

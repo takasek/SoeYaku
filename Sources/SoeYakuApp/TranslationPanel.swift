@@ -65,6 +65,13 @@ import SoeYakuCore
 
     func show() { panel.orderFrontRegardless() }
 
+    func clear() {
+        reading = nil
+        highlighted = nil
+        textView.string = ""
+        footer.stringValue = ""
+    }
+
     /// Replaces the whole text, keeping the highlighted sentence and the scroll position.
     func display(_ reading: ReadingText) {
         let origin = scrollView.contentView.bounds.origin
