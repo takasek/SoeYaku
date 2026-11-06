@@ -17,6 +17,7 @@ import UniformTypeIdentifiers
     static let previewBundleID = "com.apple.Preview"
     private let bundleID: String
     private let documentName: String?
+    private let browserTitles: [String]?
     private var locator: Locator
     private var task: Task<Void, Never>?
     private var window: SCWindow?
@@ -26,9 +27,10 @@ import UniformTypeIdentifiers
     var onResult: ((LocateResult) -> Void)?
     var onProblem: ((String) -> Void)?
 
-    init(document: SourceDocument, bundleID: String = WindowFollower.previewBundleID, excludedWindows: [NSWindow] = [], documentName: String? = nil) {
+    init(document: SourceDocument, bundleID: String = WindowFollower.previewBundleID, excludedWindows: [NSWindow] = [], documentName: String? = nil, browserTitles: [String]? = nil) {
         self.bundleID = bundleID
         self.documentName = documentName
+        self.browserTitles = browserTitles
         self.excludedWindows = excludedWindows
         locator = Locator(index: DocumentIndex(document))
     }
@@ -59,7 +61,7 @@ import UniformTypeIdentifiers
         guard let app = NSWorkspace.shared.frontmostApplication, app.bundleIdentifier == bundleID,
               let (windowID, frame) = frontWindow(of: app.processIdentifier) else { return }
         let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
-        guard normalizedPointer(mouse: NSEvent.mouseLocation, primaryScreenHeight: primaryHeight, viewerFrame: frame) != nil else { return }
+        guard normalizedPointer(mouse: NSEvent.mouseLocation, primaryScreenHeight: primaryHeight, viewerFrame: frame, viewerWindowID: windowID) != nil else { return }
         do {
             let image = try await capture(windowID: windowID, size: frame.size)
             guard !Task.isCancelled else { return }
@@ -74,7 +76,7 @@ import UniformTypeIdentifiers
             guard NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier,
                   let (currentWindowID, currentFrame) = frontWindow(of: app.processIdentifier),
                   currentWindowID == windowID, currentFrame == frame,
-                  let pointer = normalizedPointer(mouse: NSEvent.mouseLocation, primaryScreenHeight: primaryHeight, viewerFrame: frame)
+                  let pointer = normalizedPointer(mouse: NSEvent.mouseLocation, primaryScreenHeight: primaryHeight, viewerFrame: frame, viewerWindowID: windowID)
             else { return }
             onResult?(locator.locate(lines: lastLines, pointer: pointer))
         } catch {
@@ -82,9 +84,23 @@ import UniformTypeIdentifiers
         }
     }
 
-    func normalizedPointer(mouse: CGPoint, primaryScreenHeight: CGFloat, viewerFrame: CGRect) -> CGPoint? {
-        guard !excludedWindows.contains(where: { $0.isVisible && $0.isOnActiveSpace && !$0.isMiniaturized && $0.frame.contains(mouse) }) else { return nil }
-        return ScreenGeometry.normalizedPointer(mouse: mouse, primaryScreenHeight: primaryScreenHeight, windowFrame: viewerFrame)
+    func normalizedPointer(mouse: CGPoint, primaryScreenHeight: CGFloat, viewerFrame: CGRect, viewerWindowID: CGWindowID, windows: [[String: Any]]? = nil) -> CGPoint? {
+        guard let pointer = ScreenGeometry.normalizedPointer(mouse: mouse, primaryScreenHeight: primaryScreenHeight, windowFrame: viewerFrame) else { return nil }
+        let ignored = Set(excludedWindows.filter { !$0.isVisible || !$0.isOnActiveSpace || $0.isMiniaturized }.map { CGWindowID($0.windowNumber) })
+        let list = windows ?? (CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? [])
+        let point = CGPoint(x: mouse.x, y: primaryScreenHeight - mouse.y)
+        for info in list {
+            guard let number = info[kCGWindowNumber as String] as? CGWindowID, !ignored.contains(number),
+                  (info[kCGWindowIsOnscreen as String] as? Bool ?? true),
+                  (info[kCGWindowAlpha as String] as? Double ?? 1) > 0 else { continue }
+            if (info[kCGWindowLayer as String] as? Int) == Int(CGWindowLevelForKey(.cursorWindow)),
+               info[kCGWindowOwnerName as String] as? String == "Window Server" { continue }
+            guard let bounds = info[kCGWindowBounds as String] as? NSDictionary,
+                  let frame = CGRect(dictionaryRepresentation: bounds as CFDictionary), frame.contains(point) else { continue }
+            // A normal-level translation window behind the reader must not block following.
+            return number == viewerWindowID ? pointer : nil
+        }
+        return nil
     }
 
     private func capture(windowID: CGWindowID, size: CGSize) async throws -> CGImage {
@@ -105,14 +121,38 @@ import UniformTypeIdentifiers
 
     private enum CaptureError: LocalizedError {
         case windowGone
-        var errorDescription: String? { "プレビューのウインドウを取得できませんでした。" }
+        var errorDescription: String? { "閲覧元のウインドウを取得できませんでした。" }
     }
 
     /// The topmost normal window of the process, with its frame in global top-left coordinates.
     private func frontWindow(of pid: pid_t) -> (CGWindowID, CGRect)? {
         guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
                 as? [[String: Any]] else { return nil }
+        if let browserTitles { return Self.frontBrowserWindow(in: list, pid: pid, titles: browserTitles) }
         return Self.frontDocumentWindow(in: list, pid: pid, documentName: documentName)
+    }
+
+    static func frontBrowserWindow(in list: [[String: Any]], pid: pid_t, titles: [String]) -> (CGWindowID, CGRect)? {
+        let suffixes = ["Google Chrome", "Mozilla Firefox", "Microsoft Edge", "Brave", "Safari", "Arc"]
+        func normalized(_ title: String) -> String {
+            var value = title.precomposedStringWithCompatibilityMapping.trimmingCharacters(in: .whitespacesAndNewlines)
+            for suffix in suffixes {
+                for separator in [" - ", " – ", " — "] where value.hasSuffix(separator + suffix) {
+                    value.removeLast((separator + suffix).count)
+                }
+            }
+            return value.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        }
+        let expected = Set(titles.map(normalized).filter { !$0.isEmpty })
+        for info in list where (info[kCGWindowOwnerPID as String] as? pid_t) == pid && (info[kCGWindowLayer as String] as? Int) == 0 {
+            guard let number = info[kCGWindowNumber as String] as? CGWindowID,
+                  let bounds = info[kCGWindowBounds as String] as? NSDictionary,
+                  let frame = CGRect(dictionaryRepresentation: bounds as CFDictionary), frame.width >= 300, frame.height >= 200,
+                  let title = info[kCGWindowName as String] as? String else { continue }
+            // Match only the front normal browser window; never follow a matching page behind another one.
+            return expected.contains(normalized(title)) ? (number, frame) : nil
+        }
+        return nil
     }
 
     static func frontDocumentWindow(in list: [[String: Any]], pid: pid_t, documentName: String?) -> (CGWindowID, CGRect)? {

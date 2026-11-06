@@ -12,7 +12,14 @@ import UniformTypeIdentifiers
     @Published private(set) var translating = false
     @Published private(set) var loading = false
     @Published private(set) var following = false
-    @Published private(set) var status = "英語の PDF を開いてください。"
+    @Published private(set) var status = "英語の PDF・HTML、または公開ページの URL を開いてください。"
+    let browsers: [BrowserChoice]
+    @Published var browserBundleID: String {
+        didSet {
+            UserDefaults.standard.set(browserBundleID, forKey: "browserBundleID")
+            if isHTML { stopFollowing() }
+        }
+    }
     @Published var model: URL?
     @Published var fontSize = UserDefaults.standard.double(forKey: "fontSize").clampedFont {
         didSet { UserDefaults.standard.set(fontSize, forKey: "fontSize"); panel.fontSize = fontSize }
@@ -27,11 +34,17 @@ import UniformTypeIdentifiers
     private let loadDocument: @Sendable (URL) async throws -> SourceDocument
 
     var translatedCount: Int { translations.lazy.compactMap { $0 }.count }
+    var isHTML: Bool { documentURL.flatMap { try? SourceDocumentLoader.format(of: $0) } == .html }
+    var viewerName: String { isHTML ? "ブラウザ" : "プレビュー" }
 
     init(loadDocument: @escaping @Sendable (URL) async throws -> SourceDocument = { url in
-        try await Task.detached { try PDFExtractor.extract(url: url) }.value
+        try await SourceDocumentLoader.load(url)
     }) {
         self.loadDocument = loadDocument
+        let installed = BrowserChoice.installed()
+        browsers = installed
+        let saved = UserDefaults.standard.string(forKey: "browserBundleID") ?? BrowserChoice.defaultID()
+        browserBundleID = installed.first(where: { $0.id == saved })?.id ?? installed.first?.id ?? ""
         panel.fontSize = fontSize
         if let path = UserDefaults.standard.string(forKey: "modelPath") {
             model = URL(filePath: path)
@@ -45,11 +58,30 @@ import UniformTypeIdentifiers
 
     // MARK: Document
 
-    func choosePDF() {
+    func chooseDocument() {
         let panel = NSOpenPanel()
-        panel.title = "英語の PDF を選択"
-        panel.allowedContentTypes = [.pdf]
+        panel.title = "英語の PDF・HTML を選択"
+        panel.allowedContentTypes = [.pdf, .html, UTType(filenameExtension: "xhtml") ?? .html]
         if panel.runModal() == .OK, let url = panel.url { open(url) }
+    }
+
+    func chooseURL() {
+        let alert = NSAlert()
+        alert.messageText = "公開ページを開く"
+        alert.informativeText = "HTTP / HTTPS の URL を入力してください。取得した HTML の本文を事前翻訳します。"
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 440, height: 24))
+        field.placeholderString = "https://example.com/article"
+        alert.accessoryView = field
+        alert.addButton(withTitle: "開く")
+        alert.addButton(withTitle: "キャンセル")
+        alert.window.initialFirstResponder = field
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let value = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: value), !url.isFileURL, (try? SourceDocumentLoader.format(of: url)) == .html else {
+            status = DocumentLoadError.unsupportedSource.localizedDescription
+            return
+        }
+        open(url)
     }
 
     func open(_ url: URL) {
@@ -87,10 +119,10 @@ import UniformTypeIdentifiers
         }
     }
 
-    func openInPreview() {
+    func openInViewer() {
         guard let documentURL,
-              let preview = NSWorkspace.shared.urlForApplication(withBundleIdentifier: WindowFollower.previewBundleID) else { return }
-        NSWorkspace.shared.open([documentURL], withApplicationAt: preview, configuration: NSWorkspace.OpenConfiguration())
+              let viewer = NSWorkspace.shared.urlForApplication(withBundleIdentifier: isHTML ? browserBundleID : WindowFollower.previewBundleID) else { return }
+        NSWorkspace.shared.open([documentURL], withApplicationAt: viewer, configuration: NSWorkspace.OpenConfiguration())
     }
 
     // MARK: Translation
@@ -223,7 +255,14 @@ import UniformTypeIdentifiers
     private func startFollowing() {
         guard !loading, let document else { return }
         let id = loadID
-        let follower = WindowFollower(document: document, excludedWindows: [panel.window], documentName: documentURL?.lastPathComponent)
+        let titles = [document.title, documentURL?.lastPathComponent, documentURL?.absoluteString].compactMap { $0 }.filter { !$0.isEmpty }
+        if isHTML, NSWorkspace.shared.urlForApplication(withBundleIdentifier: browserBundleID) == nil {
+            status = "閲覧するブラウザを選んでください。"
+            return
+        }
+        let follower = WindowFollower(document: document, bundleID: isHTML ? browserBundleID : WindowFollower.previewBundleID,
+                                      excludedWindows: [panel.window], documentName: documentURL?.lastPathComponent,
+                                      browserTitles: isHTML ? titles : nil)
         follower.onResult = { [weak self] result in
             guard let self, self.loadID == id else { return }
             self.show(result)
@@ -237,8 +276,8 @@ import UniformTypeIdentifiers
             self.follower = follower
             following = true
             panel.show()
-            panel.setFooter("プレビューで読みたい文にポインターを置いてください。")
-            status = "プレビューの表示に追従しています。ポインターの下の文の訳を強調します。"
+            panel.setFooter("\(viewerName)で読みたい文にポインターを置いてください。")
+            status = "\(viewerName)の表示に追従しています。ポインターの下の文の訳を強調します。"
         } catch {
             status = error.localizedDescription
         }

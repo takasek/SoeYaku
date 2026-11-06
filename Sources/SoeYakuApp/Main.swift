@@ -1,4 +1,5 @@
 import AppKit
+import SoeYakuCore
 import SoeYakuVision
 import SwiftUI
 
@@ -25,7 +26,8 @@ import SwiftUI
         let file = NSMenuItem()
         file.submenu = NSMenu(title: "ファイル")
         menu.addItem(file)
-        file.submenu?.addItem(withTitle: "PDF を開く…", action: #selector(openDocument), keyEquivalent: "o").target = self
+        file.submenu?.addItem(withTitle: "PDF・HTML を開く…", action: #selector(openDocument), keyEquivalent: "o").target = self
+        file.submenu?.addItem(withTitle: "URL を開く…", action: #selector(openURL), keyEquivalent: "u").target = self
         let edit = NSMenuItem()
         edit.submenu = NSMenu(title: "編集")
         menu.addItem(edit)
@@ -57,17 +59,18 @@ import SwiftUI
 
         // Vision loads its text recognition model on first use, which takes tens of seconds. Load it before following starts.
         Task.detached(priority: .utility) { await TextRecognizer.warmUp() }
-        if let path = CommandLine.arguments.dropFirst().first(where: { $0.lowercased().hasSuffix(".pdf") }) {
+        if let path = CommandLine.arguments.dropFirst().first(where: { ["pdf", "html", "htm", "xhtml"].contains(($0 as NSString).pathExtension.lowercased()) }) {
             reader.open(URL(filePath: path))
         }
     }
 
-    @objc private func openDocument() { reader.choosePDF() }
+    @objc private func openDocument() { reader.chooseDocument() }
+    @objc private func openURL() { reader.chooseURL() }
     @objc private func showControls() { window.makeKeyAndOrderFront(nil) }
     @objc private func showTranslation() { reader.showPanel() }
 
     func application(_ application: NSApplication, open urls: [URL]) {
-        if let pdf = urls.first(where: { $0.pathExtension.lowercased() == "pdf" }) { reader.open(pdf) }
+        if let source = urls.first(where: { (try? SourceDocumentLoader.format(of: $0)) != nil }) { reader.open(source) }
     }
 
     func windowWillClose(_ notification: Notification) {

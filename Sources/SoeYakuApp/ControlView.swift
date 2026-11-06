@@ -21,15 +21,21 @@ struct ControlView: View {
                     HStack {
                         Text("文書").font(.headline)
                         Spacer()
-                        Button("PDF を開く…") { reader.choosePDF() }.disabled(reader.translating)
-                        Button("プレビューで開く") { reader.openInPreview() }.disabled(reader.documentURL == nil)
+                        Button("PDF・HTML を開く…") { reader.chooseDocument() }.disabled(reader.translating)
+                        Button("URL を開く…") { reader.chooseURL() }.disabled(reader.translating)
+                        Button("\(reader.viewerName)で開く") { reader.openInViewer() }.disabled(reader.documentURL == nil)
+                    }
+                    if reader.isHTML {
+                        Picker("ブラウザ", selection: $reader.browserBundleID) {
+                            ForEach(reader.browsers) { browser in Text(browser.name).tag(browser.id) }
+                        }.frame(maxWidth: 280)
                     }
                     if let document = reader.document {
                         Text(document.title).lineLimit(1).truncationMode(.middle)
                         Text("\(document.sentences.count) 文・翻訳済み \(reader.translatedCount) 文")
                             .font(.caption).foregroundStyle(.secondary).monospacedDigit()
                     } else {
-                        Text("テキスト層のある英語の PDF を選び、同じファイルをプレビューで開いてください。")
+                        Text("PDF はプレビュー、HTML は選んだブラウザで同じ文書を開いて読みます。")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }.padding(6)
@@ -89,7 +95,7 @@ struct ControlView: View {
                 Text("画面の文字は現在地を探すためだけに読み、保存しません。").font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button("訳文ウインドウ") { reader.showPanel() }.disabled(reader.document == nil)
-                Button(reader.following ? "追従を止める" : "プレビューに追従") { reader.toggleFollowing() }
+                Button(reader.following ? "追従を止める" : "\(reader.viewerName)に追従") { reader.toggleFollowing() }
                     .buttonStyle(.borderedProminent).tint(reader.following ? .gray : accent).disabled(reader.document == nil)
             }
         }

@@ -4,6 +4,25 @@ import Testing
 @testable import SoeYakuApp
 
 @Suite(.serialized) @MainActor struct TranslationPanelTests {
+    @Test func translationUsesNormalLevelAndAutomaticShowingKeepsFocus() {
+        _ = NSApplication.shared
+        let controls = NSPanel(contentRect: NSRect(x: 100, y: 100, width: 300, height: 200),
+                               styleMask: [.titled, .nonactivatingPanel], backing: .buffered, defer: false)
+        let translation = TranslationPanel()
+        defer { translation.window.orderOut(nil); controls.orderOut(nil) }
+        #expect(translation.window.level == .normal)
+        #expect(!translation.window.isFloatingPanel)
+        controls.makeKeyAndOrderFront(nil)
+        translation.show()
+        #expect(translation.window.isVisible)
+        #expect(NSApp.keyWindow === controls)
+        translation.show(focus: true)
+        #expect(NSApp.keyWindow === translation.window)
+        controls.makeKeyAndOrderFront(nil)
+        translation.show()
+        #expect(NSApp.keyWindow === controls)
+    }
+
     @Test func automaticShowingKeepsTheCurrentKeyWindowButExplicitShowingSelectsTheTranslation() {
         _ = NSApplication.shared
         let controls = NSPanel(contentRect: NSRect(x: 100, y: 100, width: 300, height: 200),

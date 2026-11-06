@@ -1,7 +1,7 @@
 import AppKit
 import SoeYakuCore
 
-/// The dedicated translation window. It never activates SoeYaku, so the reader keeps the focus in Preview.
+/// A normal-level translation window. Automatic updates keep the reader's window order and focus.
 @MainActor final class TranslationPanel {
     private let panel: NSPanel
     private let scrollView = NSScrollView()
@@ -17,7 +17,8 @@ import SoeYakuCore
                         styleMask: [.titled, .closable, .resizable, .utilityWindow, .nonactivatingPanel],
                         backing: .buffered, defer: false)
         panel.title = "SoeYaku 訳文"
-        panel.level = .floating
+        panel.level = .normal
+        panel.isFloatingPanel = false
         panel.hidesOnDeactivate = false
         panel.becomesKeyOnlyIfNeeded = true
         panel.isReleasedWhenClosed = false
@@ -67,7 +68,7 @@ import SoeYakuCore
 
     func show(focus: Bool = false) {
         if focus { panel.makeKeyAndOrderFront(nil) }
-        else { panel.orderFrontRegardless() }
+        else if !panel.isVisible { panel.orderBack(nil) }
     }
 
     func clear() {

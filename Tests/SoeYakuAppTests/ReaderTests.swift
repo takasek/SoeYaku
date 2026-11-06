@@ -68,6 +68,25 @@ import Testing
         #expect(!reader.translating)
         reader.shutdown()
     }
+
+    @Test func opensStaticHTMLThroughTheSharedDocumentLoaderAndChoosesBrowserFollowing() async throws {
+        _ = NSApplication.shared
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("soeyaku-html-\(UUID().uuidString).html")
+        defer { try? FileManager.default.removeItem(at: file) }
+        try Data("<html><title>Article</title><main><p>The first paragraph.</p><p>The second paragraph.</p></main></html>".utf8).write(to: file)
+        let reader = Reader()
+        reader.model = nil
+        reader.open(file)
+        let task = try #require(reader.loadingTask)
+        await task.value
+        #expect(reader.document?.title == "Article")
+        #expect(reader.document?.sentences.map(\.text) == ["The first paragraph.", "The second paragraph."])
+        #expect(reader.isHTML)
+        #expect(reader.viewerName == "ブラウザ")
+        #expect(reader.documentURL == file)
+        #expect(reader.translations == [nil, nil])
+        reader.shutdown()
+    }
 }
 
 private actor DocumentLoader {
