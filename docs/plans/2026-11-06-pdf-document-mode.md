@@ -137,7 +137,7 @@
 - Test: `Tests/SoeYakuVisionTests/EndToEndTests.swift`
 
 **Interfaces:**
-- Produces: `public enum TextRecognizer { public static func lines(in image: CGImage) async throws -> [TextLine] }`（英語・正確モード・言語補正あり。箱は `ScreenGeometry.topLeft` で左上原点に直す）
+- Produces: `public enum TextRecognizer { public static func lines(in image: CGImage) async throws -> [TextLine]; public static func warmUp() async }`（Swift の Vision API `RecognizeTextRequest`、英語 `en-US`・`.accurate`・言語補正あり。箱は `ScreenGeometry.topLeft` で左上原点に直す。`warmUp` は文字を1行描いた小さな画像を1回認識して結果とエラーを捨てる。初回の認識はモデル読み込みで数十秒かかり、2回目以降は1画面0.1秒程度であることを確認済み）
 - CLI: `soeyaku-cli extract FILE.pdf`（文を JSON Lines）／`soeyaku-cli translate FILE.pdf --port N [--api-key K] [--glossary FILE]... [--memory FILE] [--model NAME]`（事前翻訳して `{"id","en","ja"}` を JSON Lines）／`soeyaku-cli locate FILE.pdf IMAGE.png --pointer X,Y`（画像ピクセル座標。`{"status","sentence","text","confidence"}` を1行）
 
 決めてあること:
