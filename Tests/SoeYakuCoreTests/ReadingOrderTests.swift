@@ -52,6 +52,21 @@ func line(_ text: String, x: CGFloat, top: CGFloat, width: CGFloat = 200, height
             ])
     }
 
+    @Test func shortLabelsBesideAFigureDoNotMakeAPageTwoColumn() {
+        // Seen in a real PDF: the labels of a diagram sit at the left and right of a single-column page.
+        let lines = [
+            line("intro", x: 72, top: 700, width: 468),
+            line("left label 1", x: 90, top: 660, width: 60), line("right label 1", x: 420, top: 662, width: 60),
+            line("left label 2", x: 90, top: 640, width: 60), line("right label 2", x: 420, top: 642, width: 60),
+            line("left label 3", x: 90, top: 620, width: 60), line("right label 3", x: 420, top: 622, width: 60),
+            line("heading", x: 72, top: 590, width: 30), line("continues", x: 72, top: 570, width: 468),
+        ]
+        #expect(ReadingOrder.order(lines.reversed(), pageBounds: letter).map(\.text) == [
+            "intro", "left label 1", "right label 1", "left label 2", "right label 2", "left label 3", "right label 3",
+            "heading", "continues",
+        ])
+    }
+
     @Test func fewerThanThreeLinesPerColumnIsNotTwoColumn() {
         let lines = [
             line("R0", x: 320, top: 700), line("L0", x: 72, top: 700),
@@ -177,6 +192,53 @@ func line(_ text: String, x: CGFloat, top: CGFloat, width: CGFloat = 200, height
             "1.2.1 Reading an MP4 file in a player .................................................... 3",
             "2 Building ……………… iv",
         ])
+    }
+
+    @Test func aNumberedHeadingOnOneRowEndsBeforeTheBodyThatFollowsIt() {
+        // Seen in a real PDF: the section number and the title are separate lines on one row, and the
+        // title's short last line has no punctuation and no extra space before the body.
+        let flow = [
+            line("1.2.3", x: 72, top: 700, width: 30),
+            line("Encrypting a file and adding content protection", x: 120, top: 700, width: 340),
+            line("information", x: 86, top: 686, width: 70),
+            line("Bento4 is able to encrypt a cleartext MP4 file given a set of keys, as well as to", x: 72, top: 668, width: 468),
+            line("package additional information such as content protection data.", x: 72, top: 654, width: 380),
+        ]
+        #expect(paragraphs(flow) == [
+            "1.2.3 Encrypting a file and adding content protection information",
+            "Bento4 is able to encrypt a cleartext MP4 file given a set of keys, as well as to package additional information such as content protection data.",
+        ])
+    }
+
+    @Test func aLongNumberedHeadingOnOneRowEndsBeforeTheBody() {
+        let flow = [
+            line("1.2.4", x: 72, top: 700, width: 30),
+            line("Decrypting a file sample per sample in a player", x: 120, top: 700, width: 300),
+            line("Given the set of relevant keys, Bento4 can decrypt the content of an encrypted MP4", x: 72, top: 684, width: 468),
+            line("file sample by sample for the decoder to process.", x: 72, top: 670, width: 300),
+        ]
+        #expect(paragraphs(flow) == [
+            "1.2.4 Decrypting a file sample per sample in a player",
+            "Given the set of relevant keys, Bento4 can decrypt the content of an encrypted MP4 file sample by sample for the decoder to process.",
+        ])
+    }
+
+    @Test func aWrappedLineStartingWithANumberStaysInItsParagraph() {
+        let flow = [
+            line("The new decoder runs", x: 72, top: 700, width: 468),
+            line("2.5 Times faster than the old one on the same", x: 72, top: 686, width: 468),
+            line("Machine and uses less memory.", x: 72, top: 672, width: 468),
+        ]
+        #expect(paragraphs(flow) == ["The new decoder runs 2.5 Times faster than the old one on the same Machine and uses less memory."])
+    }
+
+    @Test func aShortLineBeforeALowercaseContinuationStaysInItsParagraph() {
+        let flow = [
+            line("The encoder writes the samples", x: 72, top: 700, width: 468),
+            line("in order", x: 72, top: 686, width: 60),
+            line("so that the player can read them.", x: 72, top: 672, width: 468),
+        ]
+        #expect(paragraphs(flow) == ["The encoder writes the samples in order so that the player can read them."])
     }
 
     @Test func anEllipsisInsideBodyTextDoesNotEndTheParagraph() {

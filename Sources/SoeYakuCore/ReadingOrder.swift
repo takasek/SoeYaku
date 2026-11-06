@@ -28,14 +28,16 @@ enum ReadingOrder {
         return .full
     }
 
-    static func isTwoColumn(_ columns: [Column]) -> Bool {
-        columns.filter { $0 == .left }.count >= 3 && columns.filter { $0 == .right }.count >= 3
+    /// Only lines at least a quarter of the page wide count, so that the short labels of a figure do not look like columns.
+    static func isTwoColumn(_ lines: [PageLine], pageBounds: CGRect) -> Bool {
+        let columns = lines.filter { $0.bounds.width >= 0.25 * pageBounds.width }.map { column(of: $0, pageBounds: pageBounds) }
+        return columns.filter { $0 == .left }.count >= 3 && columns.filter { $0 == .right }.count >= 3
     }
 
     /// Orders the lines of one page the way a person reads them.
     static func order(_ lines: [PageLine], pageBounds: CGRect) -> [PageLine] {
+        guard isTwoColumn(lines, pageBounds: pageBounds) else { return topToBottom(lines) }
         let columns = lines.map { column(of: $0, pageBounds: pageBounds) }
-        guard isTwoColumn(columns) else { return topToBottom(lines) }
 
         let wide = topToBottom(zip(lines, columns).filter { $1 == .full }.map(\.0))
         func band(_ line: PageLine) -> Int {
@@ -108,9 +110,7 @@ enum ReadingOrder {
         var leftEdge: [ColumnKey: CGFloat] = [:]
         let pages = Dictionary(grouping: flow, by: \.page)
         let twoColumnPages = Set(
-            pages.filter { page, lines in
-                isTwoColumn(lines.map { column(of: $0, pageBounds: pageBounds[page]) })
-            }.keys)
+            pages.filter { page, lines in isTwoColumn(lines, pageBounds: pageBounds[page]) }.keys)
         for line in flow {
             let kind = twoColumnPages.contains(line.page) ? column(of: line, pageBounds: pageBounds[line.page]) : nil
             let key = ColumnKey(page: line.page, column: kind)
@@ -126,9 +126,11 @@ enum ReadingOrder {
         }
 
         var result: [Paragraph] = []
+        var firstLine = flow.first
         for (index, line) in flow.enumerated() {
             let text = line.text.trimmingCharacters(in: .whitespaces)
-            if index > 0,
+            if index > 0, let firstLine, let current = result.last,
+                !endsNumberedHeading(current.text, firstLine: firstLine, previous: flow[index - 1], next: line),
                 !startsParagraph(
                     line, after: flow[index - 1], key: keys[index], previousKey: keys[index - 1], widest: widest, leftEdge: leftEdge)
             {
@@ -138,9 +140,21 @@ enum ReadingOrder {
                 result[result.count - 1] = paragraph
             } else {
                 result.append(Paragraph(page: line.page, text: text, lineStarts: [(0, line.page)]))
+                firstLine = line
             }
         }
         return result
+    }
+
+    /// A paragraph so far that is one row like "1.2.4 Decrypting a file" ends when a new row starts with a capital letter.
+    private static func endsNumberedHeading(_ text: String, firstLine: PageLine, previous: PageLine, next: PageLine) -> Bool {
+        guard text.range(of: #"^\d+(\.\d+)*\.?\s+\p{Lu}"#, options: .regularExpression) != nil, !endsSentence(text),
+              sameRow(firstLine, previous), !sameRow(previous, next) else { return false }
+        return next.text.first?.isUppercase == true
+    }
+
+    private static func sameRow(_ a: PageLine, _ b: PageLine) -> Bool {
+        min(a.bounds.maxY, b.bounds.maxY) - max(a.bounds.minY, b.bounds.minY) > 0.5 * min(a.bounds.height, b.bounds.height)
     }
 
     /// Text of one paragraph with the page of every line in it.
@@ -167,10 +181,20 @@ enum ReadingOrder {
         // A taller or smaller line inside a sentence (superscript, inline math) must not split it.
         if abs(line.bounds.height - height) > 0.25 * height && endsLine { return true }
         if key == previousKey {
+            // A section number and its title are separate lines on one row.
+            if sameRow(previous, line) { return false }
             if previous.bounds.minY - line.bounds.maxY > 0.8 * height { return true }
+            // A heading's short last line has no punctuation and may sit as close to the body as a normal line.
+            if previous.bounds.width < 0.6 * (widest[key] ?? 0), endsInWord(previous.text),
+               line.text.first?.isUppercase == true { return true }
             return endsSentence(previous.text) && line.bounds.minX - (leftEdge[key] ?? line.bounds.minX) > 0.5 * height
         }
         return endsSentence(previous.text) && previous.bounds.width < 0.8 * (widest[previousKey] ?? 0)
+    }
+
+    private static func endsInWord(_ text: String) -> Bool {
+        guard let last = text.trimmingCharacters(in: .whitespaces).last else { return false }
+        return last.isLetter || last.isNumber
     }
 
     private static func endsInLeader(_ text: String) -> Bool {
