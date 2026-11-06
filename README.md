@@ -44,6 +44,8 @@ HTML5の解析には [SwiftSoup 2.14.3](https://github.com/scinfu/SwiftSoup/tree
 
 「Kikiyaku 用にコピー」は、この文書に出現する用語だけを `原語 = 訳語` の1行1組でクリップボードに入れます。Kikiyaku の用語集欄にそのまま貼れます。
 
+Kikiyaku からローカル PLaMo 3 Translate を使う場合は、用語集と翻訳方向を PFML3 へ渡す[任意の接続補助](Tools/README.md)を用意しています。[接続と資料訳の検証記録](docs/validation/kikiyaku-glossary-demo-2026-11-06.md)に、実クライアントの結果と実字幕確認の残件を記録しています。
+
 ## 画面の一部を訳す
 
 1. 操作窓で「枠1・テキスト」または「枠2・画像と訳」を選びます。
