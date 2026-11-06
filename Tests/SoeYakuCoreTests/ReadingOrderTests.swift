@@ -60,3 +60,53 @@ func line(_ text: String, x: CGFloat, top: CGFloat, width: CGFloat = 200, height
         #expect(ReadingOrder.order(lines, pageBounds: letter).map(\.text) == ["L0", "R0", "L1", "R1"])
     }
 }
+
+@Suite struct RunningElementTests {
+    /// A page with a header line at the top, a body line in the middle and a footer line at the bottom.
+    func page(_ index: Int, header: String? = nil, body: String = "body", footer: String? = nil) -> [PageLine] {
+        var lines = [line(body, x: 72, top: 400, width: 468, page: index)]
+        if let header { lines.append(line(header, x: 72, top: 770, page: index)) }
+        if let footer { lines.append(line(footer, x: 280, top: 40, width: 20, page: index)) }
+        return lines
+    }
+
+    func texts(_ pages: [[PageLine]]) -> [[String]] { pages.map { $0.map(\.text) } }
+
+    func run(_ pages: [[PageLine]]) -> [[String]] {
+        texts(ReadingOrder.removeRunningElements(pages, pageBounds: Array(repeating: letter, count: pages.count)))
+    }
+
+    @Test func removesRepeatedHeaderAndPageNumbers() {
+        let pages = (0..<3).map { page($0, header: "Running Header", footer: "\($0 + 1)") }
+        #expect(run(pages) == [["body"], ["body"], ["body"]])
+    }
+
+    @Test func removesHeadersThatDifferOnlyInDigits() {
+        let pages = (0..<3).map { page($0, header: "Page \($0 + 1) of 3") }
+        #expect(run(pages) == [["body"], ["body"], ["body"]])
+    }
+
+    @Test func removesLowercaseRomanNumeralsInTheBand() {
+        let pages = [page(0, footer: "iv"), page(1, footer: "xii"), page(2, footer: "xiii")]
+        #expect(run(pages) == [["body"], ["body"], ["body", "xiii"]])
+    }
+
+    @Test func keepsNumbersOutsideTheBands() {
+        #expect(run([page(0, body: "42")]) == [["42"]])
+    }
+
+    @Test func keepsRepeatsOnFewerThanThreePages() {
+        let pages = [page(0, header: "Chapter"), page(1, header: "Chapter")]
+        #expect(run(pages) == [["body", "Chapter"], ["body", "Chapter"]])
+    }
+
+    @Test func keepsRepeatsBelowThirtyPercentOfPages() {
+        // 3 of 11 pages is 27%; 3 of 10 pages is 30%.
+        func remaining(pageCount: Int) -> Int {
+            let pages = (0..<pageCount).map { page($0, header: $0 < 3 ? "Chapter" : nil) }
+            return run(pages).flatMap { $0 }.filter { $0 == "Chapter" }.count
+        }
+        #expect(remaining(pageCount: 11) == 3)
+        #expect(remaining(pageCount: 10) == 0)
+    }
+}

@@ -54,6 +54,35 @@ enum ReadingOrder {
         return result
     }
 
+    private static let romanNumerals: Set<String> = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x", "xi", "xii"]
+
+    /// Drops page numbers and running headers or footers from the top and bottom 8% of each page.
+    static func removeRunningElements(_ pages: [[PageLine]], pageBounds: [CGRect]) -> [[PageLine]] {
+        func inBand(_ line: PageLine, _ bounds: CGRect) -> Bool {
+            line.bounds.midY >= bounds.maxY - 0.08 * bounds.height || line.bounds.midY <= bounds.minY + 0.08 * bounds.height
+        }
+        func isNumber(_ text: String) -> Bool {
+            let trimmed = text.trimmingCharacters(in: .whitespaces)
+            return (!trimmed.isEmpty && trimmed.allSatisfy { $0.isASCII && $0.isNumber }) || romanNumerals.contains(trimmed)
+        }
+        func key(_ text: String) -> String {
+            text.lowercased().filter { !$0.isNumber }.trimmingCharacters(in: .whitespaces)
+        }
+
+        var pageCount: [String: Int] = [:]
+        for (index, lines) in pages.enumerated() {
+            let keys = Set(lines.filter { inBand($0, pageBounds[index]) }.map { key($0.text) })
+            for key in keys where !key.isEmpty { pageCount[key, default: 0] += 1 }
+        }
+        let repeated = Set(pageCount.filter { $0.value >= 3 && Double($0.value) >= 0.3 * Double(pages.count) }.keys)
+
+        return pages.enumerated().map { index, lines in
+            lines.filter { line in
+                !(inBand(line, pageBounds[index]) && (isNumber(line.text) || repeated.contains(key(line.text))))
+            }
+        }
+    }
+
     /// Top to bottom; lines at the same height read left to right.
     private static func topToBottom(_ lines: [PageLine]) -> [PageLine] {
         var rows: [[PageLine]] = []
