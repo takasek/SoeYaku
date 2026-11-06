@@ -27,6 +27,8 @@ public struct Glossary: Sendable, Equatable {
 
     public init() {}
 
+    init(terms: [GlossaryTerm]) { self.terms = terms }
+
     /// Lines are `source<TAB>target` or `source = target`; blank lines and `#` comments are ignored.
     public static func parse(_ text: String, name: String) throws -> Glossary {
         var glossary = Glossary()
