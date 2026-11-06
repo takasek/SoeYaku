@@ -160,6 +160,8 @@ enum ReadingOrder {
         _ line: PageLine, after previous: PageLine, key: ColumnKey, previousKey: ColumnKey,
         widest: [ColumnKey: CGFloat], leftEdge: [ColumnKey: CGFloat]
     ) -> Bool {
+        // A table-of-contents entry ends in a dot leader and a page number; each entry is its own paragraph.
+        if endsInLeader(previous.text) { return true }
         let height = previous.bounds.height
         let endsLine = endsSentence(previous.text) || previous.bounds.width < 0.8 * (widest[previousKey] ?? 0)
         // A taller or smaller line inside a sentence (superscript, inline math) must not split it.
@@ -169,6 +171,10 @@ enum ReadingOrder {
             return endsSentence(previous.text) && line.bounds.minX - (leftEdge[key] ?? line.bounds.minX) > 0.5 * height
         }
         return endsSentence(previous.text) && previous.bounds.width < 0.8 * (widest[previousKey] ?? 0)
+    }
+
+    private static func endsInLeader(_ text: String) -> Bool {
+        text.range(of: #"(?:[.…·․]\s*){4,}\s*(?:\d+|[ivxlcdm]+)\s*$"#, options: [.regularExpression, .caseInsensitive]) != nil
     }
 
     private static func join(_ paragraph: String, _ next: String) -> String {

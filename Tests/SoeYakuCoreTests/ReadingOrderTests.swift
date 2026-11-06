@@ -162,6 +162,31 @@ func line(_ text: String, x: CGFloat, top: CGFloat, width: CGFloat = 200, height
         #expect(result.map(\.page) == [0])
     }
 
+    @Test func eachTableOfContentsEntryEndingInADotLeaderIsItsOwnParagraph() {
+        // Seen in a real Word-exported PDF: without this rule the whole table of contents became one paragraph.
+        let flow = [
+            line("1 Why use Bento4? ............................................ 3", x: 72, top: 700, width: 468),
+            line("1.1 Overview (README.txt) .................................. 3", x: 86, top: 686, width: 454),
+            line("1.2.1 Reading an MP4 file in a", x: 100, top: 672, width: 440),
+            line("player .................................................... 3", x: 100, top: 658, width: 440),
+            line("2 Building ……………… iv", x: 72, top: 644, width: 468),
+        ]
+        #expect(paragraphs(flow) == [
+            "1 Why use Bento4? ............................................ 3",
+            "1.1 Overview (README.txt) .................................. 3",
+            "1.2.1 Reading an MP4 file in a player .................................................... 3",
+            "2 Building ……………… iv",
+        ])
+    }
+
+    @Test func anEllipsisInsideBodyTextDoesNotEndTheParagraph() {
+        let flow = [
+            line("we tried versions 1, 2, 3 .... 9 of the", x: 72, top: 700, width: 468),
+            line("encoder before settling", x: 72, top: 686, width: 468),
+        ]
+        #expect(paragraphs(flow) == ["we tried versions 1, 2, 3 .... 9 of the encoder before settling"])
+    }
+
     @Test func lineHeightChangeInsideAnUnfinishedParagraphDoesNotBreak() {
         // A superscript citation or inline math makes one line taller; no line ends a sentence.
         let flow = [
