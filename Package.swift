@@ -13,8 +13,9 @@ let package = Package(
         .target(name: "SoeYakuVision", dependencies: ["SoeYakuCore"]),
         .target(name: "SoeYakuRuntime"),
         .executableTarget(name: "SoeYakuApp", dependencies: ["SoeYakuCore", "SoeYakuVision", "SoeYakuRuntime"]),
-        .testTarget(name: "SoeYakuCoreTests", dependencies: ["SoeYakuCore"]),
-        .testTarget(name: "SoeYakuVisionTests", dependencies: ["SoeYakuVision", "SoeYakuCore"]),
+        .target(name: "SoeYakuTestSupport", path: "Tests/SoeYakuTestSupport"),
+        .testTarget(name: "SoeYakuCoreTests", dependencies: ["SoeYakuCore", "SoeYakuTestSupport"]),
+        .testTarget(name: "SoeYakuVisionTests", dependencies: ["SoeYakuVision", "SoeYakuCore", "SoeYakuTestSupport"]),
         .testTarget(name: "SoeYakuRuntimeTests", dependencies: ["SoeYakuRuntime"])
     ]
 )
