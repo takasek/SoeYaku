@@ -27,6 +27,23 @@ private func withFixture<T>(_ body: (URL) async throws -> T) async throws -> T {
 }
 
 struct CommandsTests {
+    @Test func aModelFileSharesTheAppsContentKeyAndReplacementDoesNotReuseIt() async throws {
+        let pdf = try MainFixture.write(rightColumnFirst: false)
+        let directory = pdf.deletingLastPathComponent()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = directory.appending(path: "model.gguf"), memory = directory.appending(path: "memory.json")
+        try Data("model one".utf8).write(to: model)
+        let options = TranslateOptions(file: pdf.path, port: 1, memory: memory.path, modelFile: model.path)
+        _ = try await CLI.translateLines(options, translator: FakeTranslator(), progress: { _ in })
+        let document = try PDFExtractor.extract(url: pdf)
+        let key = TranslationMemory.key(source: document.sentences[0].text, terms: [], model: try ModelIdentity.forFile(model))
+        #expect(try TranslationMemory.load(from: memory)[key] == "訳:" + document.sentences[0].text)
+        try Data("model two".utf8).write(to: model)
+        await #expect(throws: (any Error).self) {
+            _ = try await CLI.translateLines(options, translator: RefusingTranslator(), progress: { _ in })
+        }
+    }
+
     @Test func extractPrintsOneJSONObjectPerSentence() async throws {
         let lines = try await withFixture { try CLI.extractLines(file: $0) }
         #expect(lines.count == 15)

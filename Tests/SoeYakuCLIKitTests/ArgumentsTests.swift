@@ -4,6 +4,12 @@ import Testing
 @testable import SoeYakuCLIKit
 
 struct ArgumentsTests {
+    @Test func translateAcceptsAModelFileAndRejectsConflictingIdentityOptions() throws {
+        #expect(try Command.parse(["translate", "a.pdf", "--port", "8080", "--model-file", "/tmp/a.gguf"])
+            == .translate(TranslateOptions(file: "a.pdf", port: 8080, modelFile: "/tmp/a.gguf")))
+        #expect(usageMessage(["translate", "a.pdf", "--port", "8080", "--model-file", "a.gguf", "--model", "v1"]) != nil)
+    }
+
     private func usageMessage(_ arguments: [String]) -> String? {
         do {
             _ = try Command.parse(arguments)

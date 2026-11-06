@@ -17,14 +17,16 @@ public struct TranslateOptions: Equatable, Sendable {
     public var glossaries: [String]
     public var memory: String?
     public var model: String?
+    public var modelFile: String?
 
-    public init(file: String, port: Int, apiKey: String? = nil, glossaries: [String] = [], memory: String? = nil, model: String? = nil) {
+    public init(file: String, port: Int, apiKey: String? = nil, glossaries: [String] = [], memory: String? = nil, model: String? = nil, modelFile: String? = nil) {
         self.file = file
         self.port = port
         self.apiKey = apiKey
         self.glossaries = glossaries
         self.memory = memory
         self.model = model
+        self.modelFile = modelFile
     }
 }
 
@@ -37,7 +39,7 @@ public enum Command: Equatable, Sendable {
     public static let usage = """
         使い方:
           soeyaku-cli extract FILE.pdf
-          soeyaku-cli translate FILE.pdf --port N [--api-key K] [--glossary FILE]... [--memory FILE] [--model NAME]
+          soeyaku-cli translate FILE.pdf --port N [--api-key K] [--glossary FILE]... [--memory FILE] [--model-file FILE.gguf | --model VERSION]
           soeyaku-cli locate FILE.pdf IMAGE.png --pointer X,Y
         """
 
@@ -48,7 +50,7 @@ public enum Command: Equatable, Sendable {
             let (positional, _) = try split(arguments.dropFirst(), valued: [])
             return .extract(file: try one(positional, "extract は FILE.pdf を 1 つ取ります。"))
         case "translate":
-            let (positional, options) = try split(arguments.dropFirst(), valued: ["--port", "--api-key", "--glossary", "--memory", "--model"])
+            let (positional, options) = try split(arguments.dropFirst(), valued: ["--port", "--api-key", "--glossary", "--memory", "--model", "--model-file"])
             let file = try one(positional, "translate は FILE.pdf を 1 つ取ります。")
             guard let portText = options.first(where: { $0.name == "--port" })?.value else {
                 throw UsageError("--port を指定してください。")
@@ -57,11 +59,14 @@ public enum Command: Equatable, Sendable {
                 throw UsageError("--port は 1〜65535 の整数で指定してください。")
             }
             func last(_ name: String) -> String? { options.last { $0.name == name }?.value }
+            guard last("--model") == nil || last("--model-file") == nil else {
+                throw UsageError("--model と --model-file は同時に指定できません。")
+            }
             return .translate(
                 TranslateOptions(
                     file: file, port: port, apiKey: last("--api-key"),
                     glossaries: options.filter { $0.name == "--glossary" }.map(\.value),
-                    memory: last("--memory"), model: last("--model")))
+                    memory: last("--memory"), model: last("--model"), modelFile: last("--model-file")))
         case "locate":
             let (positional, options) = try split(arguments.dropFirst(), valued: ["--pointer"])
             guard positional.count == 2 else { throw UsageError("locate は FILE.pdf と IMAGE.png を取ります。") }

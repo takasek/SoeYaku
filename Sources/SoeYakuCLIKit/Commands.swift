@@ -42,11 +42,20 @@ public enum CLI {
         }
         let memory = options.memory.map { URL(fileURLWithPath: $0) } ?? StoragePaths.memory(for: document.fingerprint)
         let pretranslation = Pretranslation(
-            document: document, glossary: try Glossary.load(files), model: options.model ?? defaultModel, memoryURL: memory)
+            document: document, glossary: try Glossary.load(files), model: try modelIdentity(options), memoryURL: memory)
         let results = try await pretranslation.run(using: translator, progress: progress)
         return zip(document.sentences.sorted { $0.id < $1.id }, results).map { sentence, ja in
             jsonLine([("id", sentence.id), ("en", sentence.text), ("ja", ja.map { $0 as Any } ?? NSNull())])
         }
+    }
+
+    private static func modelIdentity(_ options: TranslateOptions) throws -> String {
+        if let version = options.model { return version }
+        let file = URL(fileURLWithPath: options.modelFile ?? "local/models/\(defaultModel)")
+        guard FileManager.default.fileExists(atPath: file.path) else {
+            throw UsageError("モデルを識別できません。--model-file でサーバーが使う GGUF、または --model で固有のバージョンを指定してください。")
+        }
+        return try ModelIdentity.forFile(file)
     }
 
     /// Recognizes the text in `image`, finds the sentence under `pointer` (image pixels, top-left origin) and returns one JSON line.
