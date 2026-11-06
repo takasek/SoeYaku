@@ -1,58 +1,7 @@
 import Foundation
 import Testing
-
+import SoeYakuTestSupport
 @testable import SoeYakuCore
-
-private typealias Block = FixturePDF.Block
-
-private let leftColumn = CGRect(x: 72, y: 100, width: 220, height: 570)
-private let rightColumn = CGRect(x: 320, y: 100, width: 220, height: 570)
-
-private let leftText =
-    "Machine translation has improved quickly over the last decade. "
-    + "The \u{FB01}rst systems relied on hand written rules and large dictionaries. "
-    + "Modern systems learn from parallel text, and the quality of the transla-\n"
-    + "tion depends mostly on the amount of data. "
-    + "A good reader wants to follow the original text while the"
-
-private let rightText =
-    "translation keeps pace with the page. "
-    + "Therefore the whole document is translated before reading begins. "
-    + "Each sentence is shown beside its source so that the reader can check the meaning quickly. "
-    + "The window follows the position of the reader and highlights the sentence that is currently"
-
-private func running(_ pageNumber: Int) -> [Block] {
-    [
-        Block(text: "Running Header", rect: CGRect(x: 72, y: 745, width: 468, height: 20), fontSize: 10),
-        Block(text: "\(pageNumber)", rect: CGRect(x: 290, y: 30, width: 40, height: 20), fontSize: 10),
-    ]
-}
-
-/// Three pages: a title and two columns (page 1), a sentence continued from page 1 and a heading (page 2), one paragraph (page 3).
-/// With `rightColumnFirst` the right column is drawn into the PDF before the left one.
-private func mainFixture(rightColumnFirst: Bool, title: String? = "Fixture Title") throws -> URL {
-    let titleBlock = Block(text: "A Study of Document Translation", rect: CGRect(x: 72, y: 690, width: 468, height: 40), fontSize: 20)
-    let left = Block(text: leftText, rect: leftColumn)
-    let right = Block(text: rightText, rect: rightColumn)
-    let page1 = running(1) + [titleBlock] + (rightColumnFirst ? [right, left] : [left, right])
-    let page2 =
-        running(2) + [
-            Block(text: "visible in the preview application. Scrolling the document moves the highlight.", rect: CGRect(x: 72, y: 690, width: 468, height: 20)),
-            Block(text: "Results", rect: CGRect(x: 72, y: 650, width: 468, height: 28), fontSize: 16),
-            Block(
-                text: "The system translated every sentence in the test document. "
-                    + "Most sentences were translated correctly with an e\u{FB03}cient model. "
-                    + "Nothing was lost between the pages.",
-                rect: CGRect(x: 72, y: 520, width: 468, height: 110)),
-        ]
-    let page3 =
-        running(3) + [
-            Block(
-                text: "This short page closes the example. It has only one paragraph with two sentences.",
-                rect: CGRect(x: 72, y: 600, width: 468, height: 100))
-        ]
-    return try FixturePDF.writeTemporary(pages: [page1, page2, page3], title: title, name: "main")
-}
 
 private func rows(_ document: SourceDocument) -> [String] {
     document.sentences.map { "\($0.id)|\($0.paragraph)|\($0.page)|\($0.text)" }
@@ -60,7 +9,7 @@ private func rows(_ document: SourceDocument) -> [String] {
 
 @Suite struct PDFExtractorTests {
     @Test func extractsBodySentencesInReadingOrder() throws {
-        let url = try mainFixture(rightColumnFirst: true)
+        let url = try MainFixture.write(rightColumnFirst: true)
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let document = try PDFExtractor.extract(url: url)
         #expect(
@@ -84,8 +33,8 @@ private func rows(_ document: SourceDocument) -> [String] {
     }
 
     @Test func drawOrderDoesNotChangeTheResult() throws {
-        let rightFirst = try mainFixture(rightColumnFirst: true)
-        let leftFirst = try mainFixture(rightColumnFirst: false)
+        let rightFirst = try MainFixture.write(rightColumnFirst: true)
+        let leftFirst = try MainFixture.write(rightColumnFirst: false)
         defer {
             try? FileManager.default.removeItem(at: rightFirst.deletingLastPathComponent())
             try? FileManager.default.removeItem(at: leftFirst.deletingLastPathComponent())
@@ -94,7 +43,7 @@ private func rows(_ document: SourceDocument) -> [String] {
     }
 
     @Test func leftColumnSentencesPrecedeRightColumnSentences() throws {
-        let url = try mainFixture(rightColumnFirst: true)
+        let url = try MainFixture.write(rightColumnFirst: true)
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let sentences = try PDFExtractor.extract(url: url).sentences
         func id(containing text: String) throws -> Int {
@@ -105,7 +54,7 @@ private func rows(_ document: SourceDocument) -> [String] {
     }
 
     @Test func runningHeaderAndPageNumbersAreNotSentences() throws {
-        let url = try mainFixture(rightColumnFirst: true)
+        let url = try MainFixture.write(rightColumnFirst: true)
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let texts = try PDFExtractor.extract(url: url).sentences.map(\.text)
         #expect(!texts.contains { $0.contains("Running Header") })
@@ -113,7 +62,7 @@ private func rows(_ document: SourceDocument) -> [String] {
     }
 
     @Test func headingIsItsOwnParagraph() throws {
-        let url = try mainFixture(rightColumnFirst: false)
+        let url = try MainFixture.write(rightColumnFirst: false)
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let sentences = try PDFExtractor.extract(url: url).sentences
         let heading = try #require(sentences.first { $0.text == "Results" })
@@ -121,7 +70,7 @@ private func rows(_ document: SourceDocument) -> [String] {
     }
 
     @Test func sentenceCrossingAColumnAndAPageIsOneSentence() throws {
-        let url = try mainFixture(rightColumnFirst: false)
+        let url = try MainFixture.write(rightColumnFirst: false)
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let texts = try PDFExtractor.extract(url: url).sentences.map(\.text)
         #expect(texts.contains("A good reader wants to follow the original text while the translation keeps pace with the page."))
@@ -129,20 +78,20 @@ private func rows(_ document: SourceDocument) -> [String] {
     }
 
     @Test func fingerprintIsTheSHA256OfTheFile() throws {
-        let url = try mainFixture(rightColumnFirst: false)
+        let url = try MainFixture.write(rightColumnFirst: false)
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let document = try PDFExtractor.extract(url: url)
         #expect(document.fingerprint == SourceDocument.fingerprint(of: try Data(contentsOf: url)))
     }
 
     @Test func titleComesFromThePDFAttribute() throws {
-        let url = try mainFixture(rightColumnFirst: false, title: "Fixture Title")
+        let url = try MainFixture.write(rightColumnFirst: false, title: "Fixture Title")
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         #expect(try PDFExtractor.extract(url: url).title == "Fixture Title")
     }
 
     @Test func titleFallsBackToTheFileNameWithoutExtension() throws {
-        let url = try mainFixture(rightColumnFirst: false, title: nil)
+        let url = try MainFixture.write(rightColumnFirst: false, title: nil)
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         #expect(try PDFExtractor.extract(url: url).title == "main")
     }
