@@ -134,21 +134,21 @@ import UniformTypeIdentifiers
 
     private func pretranslation(for document: SourceDocument) throws -> Pretranslation {
         Pretranslation(document: document, glossary: try glossary(for: document), model: model?.lastPathComponent ?? "",
-                       memoryURL: Storage.memory(for: document.fingerprint))
+                       memoryURL: StoragePaths.memory(for: document.fingerprint))
     }
 
     // MARK: Glossary
 
     private func glossary(for document: SourceDocument) throws -> Glossary {
-        let files = [Storage.commonGlossary, Storage.documentGlossary(for: document.fingerprint)]
+        let files = [StoragePaths.commonGlossary, StoragePaths.documentGlossary(for: document.fingerprint)]
         return try Glossary.load(files.filter { FileManager.default.fileExists(atPath: $0.path) })
     }
 
-    func openCommonGlossary() { edit(Storage.commonGlossary, scope: "共通") }
+    func openCommonGlossary() { edit(StoragePaths.commonGlossary, scope: "共通") }
 
     func openDocumentGlossary() {
         guard let document else { return }
-        edit(Storage.documentGlossary(for: document.fingerprint), scope: "「\(document.title)」")
+        edit(StoragePaths.documentGlossary(for: document.fingerprint), scope: "「\(document.title)」")
     }
 
     private func edit(_ url: URL, scope: String) {

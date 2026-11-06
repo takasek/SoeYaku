@@ -1,17 +1,8 @@
 import Foundation
+import SoeYakuCore
 
-/// Files SoeYaku keeps for the user: the shared glossary and, per document, its glossary and saved translations.
+/// Glossary files the app creates for the user to edit; their locations come from `StoragePaths`, shared with soeyaku-cli.
 enum Storage {
-    static var root: URL {
-        URL.applicationSupportDirectory.appending(path: "SoeYaku", directoryHint: .isDirectory)
-    }
-    static var commonGlossary: URL { root.appending(path: "glossary.txt") }
-    static func folder(for fingerprint: String) -> URL {
-        root.appending(path: "Documents", directoryHint: .isDirectory).appending(path: fingerprint, directoryHint: .isDirectory)
-    }
-    static func documentGlossary(for fingerprint: String) -> URL { folder(for: fingerprint).appending(path: "glossary.txt") }
-    static func memory(for fingerprint: String) -> URL { folder(for: fingerprint).appending(path: "memory.json") }
-
     /// Creates an empty glossary with a format note so that opening it in an editor shows how to write entries.
     static func ensureGlossary(at url: URL, scope: String) throws {
         guard !FileManager.default.fileExists(atPath: url.path) else { return }
