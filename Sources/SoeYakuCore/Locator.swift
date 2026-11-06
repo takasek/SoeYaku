@@ -23,6 +23,7 @@ public struct DocumentIndex: Sendable {
     static let maxOccurrences = 64
 
     let tokenCount: Int
+    let tokens: [String]
     let sentenceOfToken: [Int]
     let occurrences: [String: [Int]]
 
@@ -42,6 +43,7 @@ public struct DocumentIndex: Sendable {
             }
         }
         self.tokenCount = tokens.count
+        self.tokens = tokens
         self.sentenceOfToken = sentenceOfToken
         self.occurrences = occurrences.filter { $0.value.count <= Self.maxOccurrences }
     }
@@ -74,6 +76,17 @@ public struct Locator: Sendable {
         var tokens: [String]
     }
 
+    private enum Resolution {
+        case located(Int, Double)
+        case insufficientContext
+        case rejected
+
+        var match: (Int, Double)? {
+            if case .located(let sentence, let confidence) = self { return (sentence, confidence) }
+            return nil
+        }
+    }
+
     private func resolve(lines: [TextLine], pointer: CGPoint) -> (Int, Double)? {
         let candidates = lines.enumerated().compactMap { id, line -> Candidate? in
             let tokens = TextNormalizer.tokens(line.text)
@@ -82,20 +95,21 @@ public struct Locator: Sendable {
         }
         guard let anchor = anchorLine(in: candidates, pointer: pointer) else { return nil }
 
-        var column = contextLines(around: anchor, in: candidates)
+        let column = contextLines(around: anchor, in: candidates)
         let anchorPosition = column.firstIndex { $0.id == anchor.id } ?? 0
-        joinHyphenatedWords(&column)
-        var query: [String] = []
-        var anchorRange = 0..<0
-        for (offset, entry) in column.enumerated() {
-            let start = query.count
-            query.append(contentsOf: entry.tokens)
-            if offset == anchorPosition { anchorRange = start..<query.count }
+        let contextual = resolve(column: column, anchorPosition: anchorPosition, pointer: pointer)
+        if case .insufficientContext = contextual {
+            return resolve(column: [anchor], anchorPosition: 0, pointer: pointer).match
         }
-        guard !anchorRange.isEmpty else { return nil }
+        return contextual.match
+    }
+
+    private func resolve(column: [Candidate], anchorPosition: Int, pointer: CGPoint) -> Resolution {
+        let (query, positions) = joinedQuery(column)
+        let anchorPositions = positions[anchorPosition]
 
         let gramCount = query.count - 2
-        guard gramCount > 0 else { return nil }
+        guard gramCount > 0 else { return .insufficientContext }
         var votes: [Int: Int] = [:]
         for q in 0..<gramCount {
             for p in index.occurrences[DocumentIndex.gram(query, q)] ?? [] {
@@ -106,17 +120,18 @@ public struct Locator: Sendable {
         for d in votes.keys {
             scores[d] = (-3...3).reduce(0) { $0 + (votes[d + $1] ?? 0) }
         }
-        guard let best = scores.max(by: { ($0.value, -$0.key) < ($1.value, -$1.key) }) else { return nil }
-        guard best.value >= 2, Double(best.value) >= 0.25 * Double(gramCount) else { return nil }
+        guard let best = scores.max(by: {
+            ($0.value, votes[$0.key] ?? 0, -$0.key) < ($1.value, votes[$1.key] ?? 0, -$1.key)
+        }) else { return .insufficientContext }
+        guard best.value >= 2, Double(best.value) >= 0.25 * Double(gramCount) else { return .insufficientContext }
 
-        let target = anchorRange.lowerBound + tokenOffset(
-            in: column[anchorPosition], fraction: pointer.x)
+        let target = anchorPositions[tokenOffset(in: column[anchorPosition], fraction: pointer.x)]
         let rivals = scores.filter {
             abs($0.key - best.key) > 30 && Double($0.value) >= 0.75 * Double(best.value)
         }.map(\.key)
         var chosen = best.key
         if !rivals.isEmpty {
-            guard let last = lastSentence else { return nil }
+            guard let last = lastSentence else { return .rejected }
             let sentenceFor = { (shift: Int) -> Int? in
                 let position = shift + target
                 return (0..<index.tokenCount).contains(position) ? index.sentenceOfToken[position] : nil
@@ -124,12 +139,26 @@ public struct Locator: Sendable {
             let options = ([best.key] + rivals.sorted()).compactMap { shift in
                 sentenceFor(shift).map { (shift: shift, distance: abs($0 - last)) }
             }
-            guard let nearest = options.min(by: { $0.distance < $1.distance }) else { return nil }
+            guard let nearest = options.min(by: { $0.distance < $1.distance }) else { return .rejected }
             chosen = nearest.shift
         }
-        let position = chosen + target
-        guard (0..<index.tokenCount).contains(position) else { return nil }
-        return (index.sentenceOfToken[position], min(1, Double(best.value) / Double(gramCount)))
+        // Context may omit a wrapped heading or contain an extra OCR token. Align the physical anchor within the smoothed vote band.
+        let aligned = (-3...3).compactMap { adjustment -> (shift: Int, matches: Int)? in
+            let shift = chosen + adjustment
+            let position = shift + target
+            guard (0..<index.tokenCount).contains(position), query[target] == index.tokens[position] else { return nil }
+            let matches = anchorPositions.filter { q in
+                let p = shift + q
+                return (0..<index.tokenCount).contains(p) && query[q] == index.tokens[p]
+            }.count
+            return matches * 2 >= anchorPositions.count ? (shift, matches) : nil
+        }.max {
+            ($0.matches, votes[$0.shift] ?? 0, -abs($0.shift - chosen))
+                < ($1.matches, votes[$1.shift] ?? 0, -abs($1.shift - chosen))
+        }
+        guard let aligned else { return .rejected }
+        let position = aligned.shift + target
+        return .located(index.sentenceOfToken[position], min(1, Double(best.value) / Double(gramCount)))
     }
 
     /// The line under the pointer, or failing that the nearest line within two line heights.
@@ -169,16 +198,24 @@ public struct Locator: Sendable {
     }
 
     /// A line ending in a letter and "-" continues with the first token of the next line.
-    private func joinHyphenatedWords(_ column: inout [Candidate]) {
-        guard column.count > 1 else { return }
-        for k in 0..<(column.count - 1) {
-            let trimmed = column[k].line.text.trimmingCharacters(in: .whitespaces)
-            guard trimmed.hasSuffix("-"),
-                  let beforeHyphen = trimmed.dropLast().last, beforeHyphen.isLetter,
-                  !column[k].tokens.isEmpty, !column[k + 1].tokens.isEmpty
-            else { continue }
-            column[k].tokens[column[k].tokens.count - 1] += column[k + 1].tokens.removeFirst()
+    private func joinedQuery(_ column: [Candidate]) -> ([String], [[Int]]) {
+        var query: [String] = []
+        var positions: [[Int]] = []
+        for (k, entry) in column.enumerated() {
+            let previous = k > 0 ? column[k - 1].line.text.trimmingCharacters(in: .whitespaces) : ""
+            let joins = previous.hasSuffix("-") && previous.dropLast().last?.isLetter == true && !query.isEmpty
+            var linePositions: [Int] = []
+            for (offset, token) in entry.tokens.enumerated() {
+                if offset == 0 && joins {
+                    query[query.count - 1] += token
+                } else {
+                    query.append(token)
+                }
+                linePositions.append(query.count - 1)
+            }
+            positions.append(linePositions)
         }
+        return (query, positions)
     }
 
     /// The token of `entry` at the pointer's horizontal position, by character offset.

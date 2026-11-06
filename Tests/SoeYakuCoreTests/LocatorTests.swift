@@ -147,10 +147,91 @@ struct LocatorTests {
         #expect(result == .matched(sentence: 3, confidence: 1))
     }
 
+    @Test func viewerChromeDoesNotBorrowEvidenceFromNearbyBodyLines() {
+        let document = SourceDocument(fingerprint: "chrome", title: "T", sentences: [
+            Sentence(id: 0, paragraph: 0, page: 0, text: "A preliminary statement ends here."),
+            Sentence(id: 1, paragraph: 1, page: 0, text: "The translation engine reads every sentence in order and saves the results.")
+        ])
+        var locator = Locator(index: DocumentIndex(document))
+        let lines = [
+            TextLine(text: "Page 3 of 12", box: CGRect(x: 0.1, y: 0.1, width: 0.3, height: 0.02)),
+            TextLine(text: "The translation engine reads every sentence", box: CGRect(x: 0.1, y: 0.13, width: 0.8, height: 0.02)),
+            TextLine(text: "in order and saves the results.", box: CGRect(x: 0.1, y: 0.16, width: 0.55, height: 0.02))
+        ]
+        _ = locator.locate(lines: lines, pointer: Self.pointer(on: lines[1], at: 0.1))
+        #expect(locator.lastSentence == 1)
+        #expect(locator.locate(lines: lines, pointer: Self.pointer(on: lines[0], at: 0.5)) == .unresolved)
+        #expect(locator.lastSentence == 1)
+    }
+
+    @Test func strongBodyContextPreventsAChromeLineFromMatchingDistantDocumentText() {
+        let texts = [
+            "A preliminary statement ends here.",
+            "The translation engine reads every sentence in order and saves the results.",
+            "Neural methods improve language processing across many complex situations while preserving useful context for every reader. Another unrelated study describes additional examples using many different document layouts and several unusual display configurations.",
+            "Page 3 of 12"
+        ]
+        let document = SourceDocument(fingerprint: "chrome-repeat", title: "T", sentences: texts.enumerated().map {
+            Sentence(id: $0.offset, paragraph: $0.offset, page: 0, text: $0.element)
+        })
+        let lines = [
+            TextLine(text: "Page 3 of 12", box: CGRect(x: 0.1, y: 0.1, width: 0.3, height: 0.02)),
+            TextLine(text: "The translation engine reads every sentence", box: CGRect(x: 0.1, y: 0.13, width: 0.8, height: 0.02)),
+            TextLine(text: "in order and saves the results.", box: CGRect(x: 0.1, y: 0.16, width: 0.55, height: 0.02))
+        ]
+        var locator = Locator(index: DocumentIndex(document))
+        #expect(Self.matchedSentence(locator.locate(lines: lines, pointer: CGPoint(x: 0.18, y: 0.14))) == 1)
+        #expect(locator.locate(lines: lines, pointer: CGPoint(x: 0.25, y: 0.11)) == .unresolved)
+        #expect(locator.lastSentence == 1)
+    }
+
+    @Test func aHyphenatedContinuationKeepsItsPhysicalPointerPosition() {
+        let document = SourceDocument(fingerprint: "hyphen", title: "T", sentences: [
+            Sentence(id: 0, paragraph: 0, page: 0, text: "This is a sample translation."),
+            Sentence(id: 1, paragraph: 0, page: 0, text: "Readers can follow the complete text without waiting.")
+        ])
+        let lines = Self.page(["This is a sample transla-", "tion. Readers can follow the complete text", "without waiting."])
+        var locator = Locator(index: DocumentIndex(document))
+        #expect(Self.matchedSentence(locator.locate(lines: lines, pointer: Self.pointer(on: lines[1], at: 0.01))) == 0)
+        #expect(Self.matchedSentence(locator.locate(lines: lines, pointer: Self.pointer(on: lines[1], at: 0.3))) == 1)
+    }
+
+    @Test func aLineContainingOnlyAHyphenatedContinuationCanBeLocated() {
+        let lines = Self.page(["In this paper we describe a small tool that transla-", "tes", "sentences in place."])
+        var locator = Self.makeLocator()
+        #expect(Self.matchedSentence(locator.locate(lines: lines, pointer: Self.pointer(on: lines[1], at: 0.5))) == 3)
+    }
+
     @Test func aHeadingLineAloneIsUnresolved() {
         let lines = Self.page(["Results"])
         var locator = Self.makeLocator()
         #expect(locator.locate(lines: lines, pointer: Self.pointer(on: lines[0], at: 0.5)) == .unresolved)
+    }
+
+    @Test func aHeadingStillMatchesWhenOCRMissesItsContinuationInTheContextColumn() {
+        let document = SourceDocument(fingerprint: "heading", title: "T", sentences: [
+            Sentence(id: 0, paragraph: 0, page: 0, text: "1.2.3 Encrypting a file and adding content protection information"),
+            Sentence(id: 1, paragraph: 1, page: 0, text: "Bento4 is able to encrypt a cleartext MP4 file given a set of keys, as well as to package additional information such as content protection data.")
+        ])
+        let lines = Self.page([
+            "AAC", "encoder", "Encrypting a file and adding content protection",
+            "Bento4 is able to encrypt a cleartext MP4 file given a set of keys, as well as to",
+            "package additional information such as content protection data."
+        ])
+        var locator = Locator(index: DocumentIndex(document))
+        #expect(Self.matchedSentence(locator.locate(lines: lines, pointer: Self.pointer(on: lines[2], at: 0.25))) == 0)
+    }
+
+    @Test func aReadableShortLineDoesNotLoseItsMatchToUnrecognizedContext() {
+        let document = SourceDocument(fingerprint: "edge", title: "T", sentences: [
+            Sentence(id: 0, paragraph: 0, page: 0, text: "Bento4 packages an MP4 file. Below is an example of a complete setup.")
+        ])
+        let lines = Self.page([
+            "Dentut is due to package an hire me lur ail encoutr vulpul Delow is all exampie",
+            "of a complete setup.", "microphone CM", "AAC encoder samples"
+        ])
+        var locator = Locator(index: DocumentIndex(document))
+        #expect(Self.matchedSentence(locator.locate(lines: lines, pointer: Self.pointer(on: lines[1], at: 0.5))) == 0)
     }
 
     @Test func aHeadingWithItsFollowingBodyLinesAsContextResolvesToTheSecondOccurrence() {
