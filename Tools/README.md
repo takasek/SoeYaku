@@ -1,6 +1,6 @@
-# Kikiyaku とローカル PLaMo 3 の接続実験
+# KikiyakuとPLaMo 3の送信形式を変換するHTTPアダプタ
 
-`kikiyaku_plamo.py` は、Kikiyaku の既定の翻訳リクエストを PLaMo 3 Translate の PFML3 形式へ変換する任意の補助ツールです。SoeYaku 本体には不要です。Python 3 の標準ライブラリだけを使います。
+`kikiyaku_plamo.py` は、Kikiyakuから届いたリクエストから原文・翻訳方向・用語集を取り出し、PLaMo 3 Translateの入力形式（PFML3）へ変換してローカルのllama-serverへ送るHTTPアダプタです。KikiyakuとPLaMoの間にある送信形式の差を埋めます。SoeYaku本体には不要で、Python 3の標準ライブラリだけを使います。
 
 対象は [Kikiyaku `8dcc192`](https://github.com/utahta/kikiyaku/tree/8dcc192421937bf0fd632809f53899319b65eb37) の OpenAI 互換接続・既定システムプロンプト・英日翻訳です。Kikiyaku 本体の変更は不要です。システム指示に渡した用語集を除外する PLaMo の chat template を使う場合にも、用語と翻訳方向を直接モデルへ渡せます。
 

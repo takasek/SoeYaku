@@ -44,7 +44,7 @@ HTML5の解析には [SwiftSoup 2.14.3](https://github.com/scinfu/SwiftSoup/tree
 
 「Kikiyaku 用にコピー」は、この文書に出現する用語だけを `原語 = 訳語` の1行1組でクリップボードに入れます。Kikiyaku の用語集欄にそのまま貼れます。
 
-Kikiyaku からローカル PLaMo 3 Translate を使う場合は、用語集と翻訳方向を PFML3 へ渡す[任意の接続補助](Tools/README.md)を用意しています。36秒の講演から認識した5発話と関連資料8文で、「子プロセス」「標準出力」が両方に現れることを確認しました。[接続・実字幕・資料訳の検証記録](docs/validation/kikiyaku-glossary-demo-2026-11-06.md)に条件と制約を記録しています。
+Kikiyaku からローカル PLaMo 3 Translate を使う場合は、両者で異なる原文・翻訳方向・用語集の送信形式を変換する[HTTPアダプタ](Tools/README.md)を用意しています。36秒の講演から認識した5発話と関連資料8文に、「子プロセス」「標準出力」が共通して現れました。[接続・実字幕・資料訳の記録](docs/validation/kikiyaku-glossary-demo-2026-11-06.md)に条件と制約を記録しています。
 
 ## 画面の一部を訳す
 
