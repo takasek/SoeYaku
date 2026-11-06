@@ -1,0 +1,274 @@
+import CoreGraphics
+import Testing
+
+@testable import SoeYakuCore
+
+let letter = CGRect(x: 0, y: 0, width: 612, height: 792)
+
+/// `top` is the y of the line's upper edge in page space.
+func line(_ text: String, x: CGFloat, top: CGFloat, width: CGFloat = 200, height: CGFloat = 11, page: Int = 0) -> PageLine {
+    PageLine(text: text, bounds: CGRect(x: x, y: top - height, width: width, height: height), page: page)
+}
+
+@Suite struct OrderTests {
+    @Test func singleColumnReadsTopToBottom() {
+        let lines = [
+            line("c", x: 72, top: 500, width: 468),
+            line("a", x: 72, top: 700, width: 468),
+            line("b", x: 72, top: 600, width: 468),
+        ]
+        #expect(ReadingOrder.order(lines, pageBounds: letter).map(\.text) == ["a", "b", "c"])
+    }
+
+    @Test func sameHeightReadsLeftToRight() {
+        let lines = [
+            line("right", x: 400, top: 600, width: 100),
+            line("left", x: 72, top: 600, width: 100),
+        ]
+        #expect(ReadingOrder.order(lines, pageBounds: letter).map(\.text) == ["left", "right"])
+    }
+
+    @Test func twoColumnsReadLeftThenRight() {
+        let left = (0..<4).map { line("L\($0)", x: 72, top: 700 - CGFloat($0) * 14) }
+        let right = (0..<4).map { line("R\($0)", x: 320, top: 700 - CGFloat($0) * 14) }
+        let shuffled = [right[1], left[2], right[0], left[0], right[3], left[3], left[1], right[2]]
+        let ordered = ReadingOrder.order(shuffled, pageBounds: letter).map(\.text)
+        #expect(ordered == ["L0", "L1", "L2", "L3", "R0", "R1", "R2", "R3"])
+    }
+
+    @Test func fullWidthLinesSplitTwoColumnBands() {
+        let title = line("TITLE", x: 72, top: 740, width: 468)
+        let left1 = (0..<3).map { line("A-L\($0)", x: 72, top: 700 - CGFloat($0) * 14) }
+        let right1 = (0..<3).map { line("A-R\($0)", x: 320, top: 700 - CGFloat($0) * 14) }
+        let wide = line("WIDE", x: 72, top: 600, width: 468)
+        let left2 = (0..<3).map { line("B-L\($0)", x: 72, top: 560 - CGFloat($0) * 14) }
+        let right2 = (0..<3).map { line("B-R\($0)", x: 320, top: 560 - CGFloat($0) * 14) }
+        let all = right2 + [wide] + right1 + left2 + [title] + left1
+        let ordered = ReadingOrder.order(all, pageBounds: letter).map(\.text)
+        #expect(
+            ordered == [
+                "TITLE", "A-L0", "A-L1", "A-L2", "A-R0", "A-R1", "A-R2",
+                "WIDE", "B-L0", "B-L1", "B-L2", "B-R0", "B-R1", "B-R2",
+            ])
+    }
+
+    @Test func fewerThanThreeLinesPerColumnIsNotTwoColumn() {
+        let lines = [
+            line("R0", x: 320, top: 700), line("L0", x: 72, top: 700),
+            line("R1", x: 320, top: 686), line("L1", x: 72, top: 686),
+        ]
+        #expect(ReadingOrder.order(lines, pageBounds: letter).map(\.text) == ["L0", "R0", "L1", "R1"])
+    }
+}
+
+@Suite struct ParagraphTests {
+    func paragraphs(_ flow: [PageLine], pages: Int = 1) -> [String] {
+        ReadingOrder.paragraphs(flow, pageBounds: Array(repeating: letter, count: pages)).map(\.text)
+    }
+
+    /// Full-width body lines, 14pt apart, starting at `top`.
+    func body(_ texts: [String], top: CGFloat = 700, x: CGFloat = 72, width: CGFloat = 468, page: Int = 0) -> [PageLine] {
+        texts.enumerated().map { line($1, x: x, top: top - CGFloat($0) * 14, width: width, page: page) }
+    }
+
+    @Test func consecutiveLinesFormOneParagraph() {
+        #expect(paragraphs(body(["one two", "three four", "five"])) == ["one two three four five"])
+    }
+
+    @Test func largeVerticalGapStartsAParagraph() {
+        let flow = body(["first"]) + body(["second"], top: 670)
+        #expect(paragraphs(flow) == ["first", "second"])
+    }
+
+    @Test func differentLineHeightStartsAParagraph() {
+        let flow = [
+            line("Results", x: 72, top: 700, width: 60, height: 16),
+            line("Body text", x: 72, top: 680, width: 468),
+        ]
+        #expect(paragraphs(flow) == ["Results", "Body text"])
+    }
+
+    @Test func indentAfterSentenceEndStartsAParagraph() {
+        let flow = [
+            line("It ends here.", x: 72, top: 700, width: 468),
+            line("A new one begins", x: 84, top: 686, width: 450),
+            line("and goes on.", x: 72, top: 672, width: 468),
+        ]
+        #expect(paragraphs(flow) == ["It ends here.", "A new one begins and goes on."])
+    }
+
+    @Test func indentAfterClosingQuoteStartsAParagraph() {
+        let flow = [
+            line("He said \"yes.\"", x: 72, top: 700, width: 468),
+            line("Then he left", x: 84, top: 686, width: 450),
+        ]
+        #expect(paragraphs(flow) == ["He said \"yes.\"", "Then he left"])
+    }
+
+    @Test func indentWithoutSentenceEndDoesNotBreak() {
+        let flow = [
+            line("It goes on and", x: 72, top: 700, width: 468),
+            line("on indented", x: 84, top: 686, width: 450),
+        ]
+        #expect(paragraphs(flow) == ["It goes on and on indented"])
+    }
+
+    @Test func hyphenatedBreakJoinsWithoutSpace() {
+        let flow = body(["a good transla-", "tion of text"])
+        #expect(paragraphs(flow) == ["a good translation of text"])
+    }
+
+    @Test func hyphenBeforeCapitalOrDigitKeepsHyphenAndSpace() {
+        #expect(paragraphs(body(["a well-", "Known author"])) == ["a well- Known author"])
+        #expect(paragraphs(body(["pages 3-", "5 apply"])) == ["pages 3- 5 apply"])
+    }
+
+    /// Two columns of 4 lines: the left column's last line has `lastWidth`, the right column continues.
+    func twoColumns(leftLast: String, lastWidth: CGFloat) -> [PageLine] {
+        let left = [
+            line("l0", x: 72, top: 700, width: 220), line("l1", x: 72, top: 686, width: 220),
+            line("l2", x: 72, top: 672, width: 220), line(leftLast, x: 72, top: 658, width: lastWidth),
+        ]
+        let right = (0..<4).map { line("r\($0)", x: 320, top: 700 - CGFloat($0) * 14, width: 220) }
+        return left + right
+    }
+
+    @Test func columnChangeBreaksAfterShortSentenceEndingLine() {
+        #expect(paragraphs(twoColumns(leftLast: "end.", lastWidth: 100)) == ["l0 l1 l2 end.", "r0 r1 r2 r3"])
+    }
+
+    @Test func columnChangeContinuesWhenSentenceIsOpen() {
+        #expect(paragraphs(twoColumns(leftLast: "and", lastWidth: 100)) == ["l0 l1 l2 and r0 r1 r2 r3"])
+    }
+
+    @Test func columnChangeContinuesWhenLastLineIsFull() {
+        #expect(paragraphs(twoColumns(leftLast: "end.", lastWidth: 200)) == ["l0 l1 l2 end. r0 r1 r2 r3"])
+    }
+
+    @Test func pageChangeFollowsTheSameRules() {
+        func run(last: String, width: CGFloat) -> [String] {
+            let page0 = body(["a0", "a1", "a2"], width: 468) + body([last], top: 658, width: width)
+            let page1 = body(["b0", "b1"], page: 1)
+            return paragraphs(page0 + page1, pages: 2)
+        }
+        #expect(run(last: "end.", width: 100) == ["a0 a1 a2 end.", "b0 b1"])
+        #expect(run(last: "and", width: 100) == ["a0 a1 a2 and b0 b1"])
+        #expect(run(last: "end.", width: 460) == ["a0 a1 a2 end. b0 b1"])
+    }
+
+    @Test func paragraphIsLabelledWithItsFirstPage() {
+        let flow = body(["a0", "a1"]) + body(["b0"], page: 1)
+        let result = ReadingOrder.paragraphs(flow, pageBounds: [letter, letter])
+        #expect(result.map(\.page) == [0])
+    }
+
+    @Test func lineHeightChangeInsideAnUnfinishedParagraphDoesNotBreak() {
+        // A superscript citation or inline math makes one line taller; no line ends a sentence.
+        let flow = [
+            line("the model reaches", x: 72, top: 700, width: 468),
+            line("a score of 3 with citation", x: 72, top: 686, width: 468, height: 16),
+            line("and then continues", x: 72, top: 668, width: 468),
+        ]
+        #expect(paragraphs(flow) == ["the model reaches a score of 3 with citation and then continues"])
+    }
+
+    @Test func lineHeightChangeAfterAFullLineThatEndsASentenceBreaks() {
+        let flow = [
+            line("A body line.", x: 72, top: 700, width: 468),
+            line("Heading", x: 72, top: 684, width: 468, height: 16),
+        ]
+        #expect(paragraphs(flow) == ["A body line.", "Heading"])
+    }
+
+    @Test func eachSentenceOffsetMapsToThePageOfItsLine() {
+        // Offsets are character offsets into the joined text; the dehyphenated join must keep them consistent.
+        let flow =
+            body(["Alpha beta gam-", "ma. Delta epsilon"]) + body(["zeta. Eta theta."], top: 700, page: 1)
+        let result = ReadingOrder.paragraphs(flow, pageBounds: [letter, letter])
+        #expect(result.count == 1)
+        let paragraph = result[0]
+        #expect(paragraph.text == "Alpha beta gamma. Delta epsilon zeta. Eta theta.")
+        func page(of sentence: String) -> Int? {
+            paragraph.text.range(of: sentence).map { paragraph.page(atOffset: paragraph.text.distance(from: paragraph.text.startIndex, to: $0.lowerBound)) }
+        }
+        #expect(page(of: "Alpha") == 0)
+        #expect(page(of: "Delta") == 0)
+        #expect(page(of: "zeta") == 1)
+        #expect(page(of: "Eta") == 1)
+    }
+
+    @Test func sentenceSpansReportCharacterOffsets() {
+        let spans = ReadingOrder.sentenceSpans("  One two.  Three four.")
+        #expect(spans.map(\.text) == ["One two.", "Three four."])
+        #expect(spans.map(\.offset) == [2, 12])
+    }
+}
+
+@Suite struct SentenceTests {
+    @Test func splitsAtSentenceBoundaries() {
+        let text = "Machine translation has improved. The first systems used rules! Do they still? Yes."
+        #expect(
+            ReadingOrder.sentences(text) == [
+                "Machine translation has improved.", "The first systems used rules!", "Do they still?", "Yes.",
+            ])
+    }
+
+    @Test func emptyAndWhitespaceYieldNothing() {
+        #expect(ReadingOrder.sentences("").isEmpty)
+        #expect(ReadingOrder.sentences("   ").isEmpty)
+    }
+
+    @Test func aHeadingWithoutPunctuationIsOneSentence() {
+        #expect(ReadingOrder.sentences("Results") == ["Results"])
+    }
+}
+
+@Suite struct RunningElementTests {
+    /// A page with a header line at the top, a body line in the middle and a footer line at the bottom.
+    func page(_ index: Int, header: String? = nil, body: String = "body", footer: String? = nil) -> [PageLine] {
+        var lines = [line(body, x: 72, top: 400, width: 468, page: index)]
+        if let header { lines.append(line(header, x: 72, top: 770, page: index)) }
+        if let footer { lines.append(line(footer, x: 280, top: 40, width: 20, page: index)) }
+        return lines
+    }
+
+    func texts(_ pages: [[PageLine]]) -> [[String]] { pages.map { $0.map(\.text) } }
+
+    func run(_ pages: [[PageLine]]) -> [[String]] {
+        texts(ReadingOrder.removeRunningElements(pages, pageBounds: Array(repeating: letter, count: pages.count)))
+    }
+
+    @Test func removesRepeatedHeaderAndPageNumbers() {
+        let pages = (0..<3).map { page($0, header: "Running Header", footer: "\($0 + 1)") }
+        #expect(run(pages) == [["body"], ["body"], ["body"]])
+    }
+
+    @Test func removesHeadersThatDifferOnlyInDigits() {
+        let pages = (0..<3).map { page($0, header: "Page \($0 + 1) of 3") }
+        #expect(run(pages) == [["body"], ["body"], ["body"]])
+    }
+
+    @Test func removesLowercaseRomanNumeralsInTheBand() {
+        let pages = [page(0, footer: "iv"), page(1, footer: "xii"), page(2, footer: "xiii")]
+        #expect(run(pages) == [["body"], ["body"], ["body", "xiii"]])
+    }
+
+    @Test func keepsNumbersOutsideTheBands() {
+        #expect(run([page(0, body: "42")]) == [["42"]])
+    }
+
+    @Test func keepsRepeatsOnFewerThanThreePages() {
+        let pages = [page(0, header: "Chapter"), page(1, header: "Chapter")]
+        #expect(run(pages) == [["body", "Chapter"], ["body", "Chapter"]])
+    }
+
+    @Test func keepsRepeatsBelowThirtyPercentOfPages() {
+        // 3 of 11 pages is 27%; 3 of 10 pages is 30%.
+        func remaining(pageCount: Int) -> Int {
+            let pages = (0..<pageCount).map { page($0, header: $0 < 3 ? "Chapter" : nil) }
+            return run(pages).flatMap { $0 }.filter { $0 == "Chapter" }.count
+        }
+        #expect(remaining(pageCount: 11) == 3)
+        #expect(remaining(pageCount: 10) == 0)
+    }
+}
