@@ -6,6 +6,10 @@ Mac で英語の PDF・HTML を読みながら、隣のウインドウで日本�
 
 画面の一部をその場で訳す枠モードもあります。枠1は訳を連続テキストとして、枠2は切り取った画像と原文位置の訳を一緒に表示します。どちらも全文の事前翻訳は不要です。
 
+## ライセンス
+
+SoeYaku は [MIT License](LICENSE) で提供します。第三者の著作権・ライセンス表示は、[SwiftSoup の通知](App/ThirdPartyNotices/SwiftSoup.txt)と[Kikiyaku 由来のプロンプト・試験データの通知](Tools/Kikiyaku-NOTICE.txt)に記載しています。翻訳モデルの利用・配布条件は[モデルの配布元](https://huggingface.co/pfnet/plamo-3-translate-2b-GGUF)を参照してください。
+
 ## 最初の訳を読む
 
 Apple Silicon、macOS 26 以降、Swift 6.2 以降を含む Xcode、Homebrew 版の llama.cpp、Apple Development 署名を使います。
