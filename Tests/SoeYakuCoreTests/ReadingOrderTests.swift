@@ -61,6 +61,127 @@ func line(_ text: String, x: CGFloat, top: CGFloat, width: CGFloat = 200, height
     }
 }
 
+@Suite struct ParagraphTests {
+    func paragraphs(_ flow: [PageLine], pages: Int = 1) -> [String] {
+        ReadingOrder.paragraphs(flow, pageBounds: Array(repeating: letter, count: pages)).map(\.text)
+    }
+
+    /// Full-width body lines, 14pt apart, starting at `top`.
+    func body(_ texts: [String], top: CGFloat = 700, x: CGFloat = 72, width: CGFloat = 468, page: Int = 0) -> [PageLine] {
+        texts.enumerated().map { line($1, x: x, top: top - CGFloat($0) * 14, width: width, page: page) }
+    }
+
+    @Test func consecutiveLinesFormOneParagraph() {
+        #expect(paragraphs(body(["one two", "three four", "five"])) == ["one two three four five"])
+    }
+
+    @Test func largeVerticalGapStartsAParagraph() {
+        let flow = body(["first"]) + body(["second"], top: 670)
+        #expect(paragraphs(flow) == ["first", "second"])
+    }
+
+    @Test func differentLineHeightStartsAParagraph() {
+        let flow = [
+            line("Results", x: 72, top: 700, width: 60, height: 16),
+            line("Body text", x: 72, top: 680, width: 468),
+        ]
+        #expect(paragraphs(flow) == ["Results", "Body text"])
+    }
+
+    @Test func indentAfterSentenceEndStartsAParagraph() {
+        let flow = [
+            line("It ends here.", x: 72, top: 700, width: 468),
+            line("A new one begins", x: 84, top: 686, width: 450),
+            line("and goes on.", x: 72, top: 672, width: 468),
+        ]
+        #expect(paragraphs(flow) == ["It ends here.", "A new one begins and goes on."])
+    }
+
+    @Test func indentAfterClosingQuoteStartsAParagraph() {
+        let flow = [
+            line("He said \"yes.\"", x: 72, top: 700, width: 468),
+            line("Then he left", x: 84, top: 686, width: 450),
+        ]
+        #expect(paragraphs(flow) == ["He said \"yes.\"", "Then he left"])
+    }
+
+    @Test func indentWithoutSentenceEndDoesNotBreak() {
+        let flow = [
+            line("It goes on and", x: 72, top: 700, width: 468),
+            line("on indented", x: 84, top: 686, width: 450),
+        ]
+        #expect(paragraphs(flow) == ["It goes on and on indented"])
+    }
+
+    @Test func hyphenatedBreakJoinsWithoutSpace() {
+        let flow = body(["a good transla-", "tion of text"])
+        #expect(paragraphs(flow) == ["a good translation of text"])
+    }
+
+    @Test func hyphenBeforeCapitalOrDigitKeepsHyphenAndSpace() {
+        #expect(paragraphs(body(["a well-", "Known author"])) == ["a well- Known author"])
+        #expect(paragraphs(body(["pages 3-", "5 apply"])) == ["pages 3- 5 apply"])
+    }
+
+    /// Two columns of 4 lines: the left column's last line has `lastWidth`, the right column continues.
+    func twoColumns(leftLast: String, lastWidth: CGFloat) -> [PageLine] {
+        let left = [
+            line("l0", x: 72, top: 700, width: 220), line("l1", x: 72, top: 686, width: 220),
+            line("l2", x: 72, top: 672, width: 220), line(leftLast, x: 72, top: 658, width: lastWidth),
+        ]
+        let right = (0..<4).map { line("r\($0)", x: 320, top: 700 - CGFloat($0) * 14, width: 220) }
+        return left + right
+    }
+
+    @Test func columnChangeBreaksAfterShortSentenceEndingLine() {
+        #expect(paragraphs(twoColumns(leftLast: "end.", lastWidth: 100)) == ["l0 l1 l2 end.", "r0 r1 r2 r3"])
+    }
+
+    @Test func columnChangeContinuesWhenSentenceIsOpen() {
+        #expect(paragraphs(twoColumns(leftLast: "and", lastWidth: 100)) == ["l0 l1 l2 and r0 r1 r2 r3"])
+    }
+
+    @Test func columnChangeContinuesWhenLastLineIsFull() {
+        #expect(paragraphs(twoColumns(leftLast: "end.", lastWidth: 200)) == ["l0 l1 l2 end. r0 r1 r2 r3"])
+    }
+
+    @Test func pageChangeFollowsTheSameRules() {
+        func run(last: String, width: CGFloat) -> [String] {
+            let page0 = body(["a0", "a1", "a2"], width: 468) + body([last], top: 658, width: width)
+            let page1 = body(["b0", "b1"], page: 1)
+            return paragraphs(page0 + page1, pages: 2)
+        }
+        #expect(run(last: "end.", width: 100) == ["a0 a1 a2 end.", "b0 b1"])
+        #expect(run(last: "and", width: 100) == ["a0 a1 a2 and b0 b1"])
+        #expect(run(last: "end.", width: 460) == ["a0 a1 a2 end. b0 b1"])
+    }
+
+    @Test func paragraphIsLabelledWithItsFirstPage() {
+        let flow = body(["a0", "a1"]) + body(["b0"], page: 1)
+        let result = ReadingOrder.paragraphs(flow, pageBounds: [letter, letter])
+        #expect(result.map(\.page) == [0])
+    }
+}
+
+@Suite struct SentenceTests {
+    @Test func splitsAtSentenceBoundaries() {
+        let text = "Machine translation has improved. The first systems used rules! Do they still? Yes."
+        #expect(
+            ReadingOrder.sentences(text) == [
+                "Machine translation has improved.", "The first systems used rules!", "Do they still?", "Yes.",
+            ])
+    }
+
+    @Test func emptyAndWhitespaceYieldNothing() {
+        #expect(ReadingOrder.sentences("").isEmpty)
+        #expect(ReadingOrder.sentences("   ").isEmpty)
+    }
+
+    @Test func aHeadingWithoutPunctuationIsOneSentence() {
+        #expect(ReadingOrder.sentences("Results") == ["Results"])
+    }
+}
+
 @Suite struct RunningElementTests {
     /// A page with a header line at the top, a body line in the middle and a footer line at the bottom.
     func page(_ index: Int, header: String? = nil, body: String = "body", footer: String? = nil) -> [PageLine] {

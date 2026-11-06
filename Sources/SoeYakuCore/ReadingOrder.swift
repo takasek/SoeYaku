@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import NaturalLanguage
 
 /// One line of text on a PDF page. `bounds` is in PDF page space (origin at the bottom left).
 public struct PageLine: Sendable, Equatable {
@@ -81,6 +82,92 @@ enum ReadingOrder {
                 !(inBand(line, pageBounds[index]) && (isNumber(line.text) || repeated.contains(key(line.text))))
             }
         }
+    }
+
+    private struct ColumnKey: Hashable {
+        let page: Int
+        let column: Column?
+    }
+
+    private static let closers: Set<Character> = ["\"", "'", "\u{201D}", "\u{2019}", ")", "]", "}", "\u{00BB}"]
+
+    private static func endsSentence(_ text: String) -> Bool {
+        let stripped = text.trimmingCharacters(in: .whitespaces).reversed().drop { closers.contains($0) }
+        guard let last = stripped.first else { return false }
+        return ".?!:".contains(last)
+    }
+
+    /// Splits lines in reading order (all pages) into paragraphs, labelled with the page of their first line.
+    ///
+    /// A line change that crosses a column or a page, or that changes the line height, is judged by the
+    /// sentence-end rule instead of the vertical-gap and indent rules, which only make sense inside one column.
+    static func paragraphs(_ flow: [PageLine], pageBounds: [CGRect]) -> [(page: Int, text: String)] {
+        // A column is a left or right column of a two-column page, or the whole page otherwise.
+        var keys: [ColumnKey] = []
+        var widest: [ColumnKey: CGFloat] = [:]
+        var leftEdge: [ColumnKey: CGFloat] = [:]
+        let pages = Dictionary(grouping: flow, by: \.page)
+        let twoColumnPages = Set(
+            pages.filter { page, lines in
+                isTwoColumn(lines.map { column(of: $0, pageBounds: pageBounds[page]) })
+            }.keys)
+        for line in flow {
+            let kind = twoColumnPages.contains(line.page) ? column(of: line, pageBounds: pageBounds[line.page]) : nil
+            let key = ColumnKey(page: line.page, column: kind)
+            keys.append(key)
+            widest[key] = max(widest[key] ?? 0, line.bounds.width)
+            leftEdge[key] = min(leftEdge[key] ?? .infinity, line.bounds.minX)
+        }
+
+        var result: [(page: Int, text: String)] = []
+        for (index, line) in flow.enumerated() {
+            let text = line.text.trimmingCharacters(in: .whitespaces)
+            guard index > 0 else {
+                result.append((line.page, text))
+                continue
+            }
+            let previous = flow[index - 1]
+            if startsParagraph(line, after: previous, key: keys[index], previousKey: keys[index - 1], widest: widest, leftEdge: leftEdge) {
+                result.append((line.page, text))
+            } else {
+                result[result.count - 1].text = join(result[result.count - 1].text, text)
+            }
+        }
+        return result
+    }
+
+    private static func startsParagraph(
+        _ line: PageLine, after previous: PageLine, key: ColumnKey, previousKey: ColumnKey,
+        widest: [ColumnKey: CGFloat], leftEdge: [ColumnKey: CGFloat]
+    ) -> Bool {
+        let height = previous.bounds.height
+        if abs(line.bounds.height - height) > 0.25 * height { return true }
+        if key == previousKey {
+            if previous.bounds.minY - line.bounds.maxY > 0.8 * height { return true }
+            return endsSentence(previous.text) && line.bounds.minX - (leftEdge[key] ?? line.bounds.minX) > 0.5 * height
+        }
+        return endsSentence(previous.text) && previous.bounds.width < 0.8 * (widest[previousKey] ?? 0)
+    }
+
+    private static func join(_ paragraph: String, _ next: String) -> String {
+        if paragraph.hasSuffix("-"), let before = paragraph.dropLast().last, before.isASCII, before.isLetter,
+            let first = next.first, first.isLowercase
+        {
+            return paragraph.dropLast() + next
+        }
+        return paragraph + " " + next
+    }
+
+    static func sentences(_ paragraph: String) -> [String] {
+        let tokenizer = NLTokenizer(unit: .sentence)
+        tokenizer.string = paragraph
+        var result: [String] = []
+        tokenizer.enumerateTokens(in: paragraph.startIndex..<paragraph.endIndex) { range, _ in
+            let sentence = paragraph[range].trimmingCharacters(in: .whitespacesAndNewlines)
+            if !sentence.isEmpty { result.append(sentence) }
+            return true
+        }
+        return result
     }
 
     /// Top to bottom; lines at the same height read left to right.
