@@ -7,6 +7,9 @@ import SoeYakuCore
     private let scrollView = NSScrollView()
     private let textView = NSTextView(usingTextLayoutManager: false)
     private let footer = NSTextField(wrappingLabelWithString: "")
+    private let documentContent = NSView()
+    private let mirror = MirroredFrameView()
+    private var documentFrame: CGRect?
     private var reading: ReadingText?
     private var highlighted: Int?
     var window: NSWindow { panel }
@@ -44,7 +47,7 @@ import SoeYakuCore
         footer.maximumNumberOfLines = 2
         footer.lineBreakMode = .byTruncatingTail
 
-        let content = NSView()
+        let content = documentContent
         for view in [scrollView, footer] as [NSView] {
             view.translatesAutoresizingMaskIntoConstraints = false
             content.addSubview(view)
@@ -72,6 +75,7 @@ import SoeYakuCore
     }
 
     func clear() {
+        restoreTextView()
         reading = nil
         highlighted = nil
         textView.string = ""
@@ -79,8 +83,9 @@ import SoeYakuCore
     }
 
     /// Replaces the whole text, keeping the highlighted sentence and the scroll position.
-    func display(_ reading: ReadingText) {
-        let origin = scrollView.contentView.bounds.origin
+    func display(_ reading: ReadingText, resetScroll: Bool = false) {
+        restoreTextView()
+        let origin = resetScroll ? CGPoint.zero : scrollView.contentView.bounds.origin
         self.reading = reading
         let style = NSMutableParagraphStyle()
         style.lineSpacing = fontSize * 0.3
@@ -111,6 +116,35 @@ import SoeYakuCore
     }
 
     func setFooter(_ text: String) { footer.stringValue = text }
+
+    func displayFrame(_ image: CGImage, blocks: [FrameBlock], translations: [String]) {
+        reading = nil; highlighted = nil
+        if panel.contentView !== mirror {
+            documentFrame = panel.frame
+            panel.contentView = mirror
+            panel.minSize = CGSize(width: 100, height: 100)
+            let source = CGSize(width: image.width, height: image.height)
+            panel.contentAspectRatio = source
+            let available = panel.screen?.visibleFrame.size ?? CGSize(width: 1000, height: 800)
+            let fit = FrameGeometry.aspectFit(source, in: CGRect(x: 0, y: 0, width: min(720, available.width * 0.8), height: min(720, available.height * 0.8)))
+            panel.setContentSize(fit.size)
+            if let visible = (panel.screen ?? NSScreen.main)?.visibleFrame {
+                panel.setFrameOrigin(CGPoint(x: min(max(panel.frame.minX, visible.minX), visible.maxX - panel.frame.width),
+                                             y: min(max(panel.frame.minY, visible.minY), visible.maxY - panel.frame.height)))
+            }
+        }
+        mirror.display(image, blocks: blocks, translations: translations)
+    }
+
+    private func restoreTextView() {
+        guard panel.contentView === mirror else { return }
+        mirror.display(nil)
+        panel.contentAspectRatio = .zero
+        panel.contentView = documentContent
+        panel.minSize = NSSize(width: 260, height: 200)
+        if let documentFrame { panel.setFrame(documentFrame, display: true) }
+        documentFrame = nil
+    }
 
     private func paint(_ sentence: Int) {
         guard let reading, reading.runs.indices.contains(sentence) else { return }

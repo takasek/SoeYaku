@@ -13,6 +13,16 @@ import UniformTypeIdentifiers
     @Published private(set) var loading = false
     @Published private(set) var following = false
     @Published private(set) var status = "英語の PDF・HTML、または公開ページの URL を開いてください。"
+    @Published var mode: ReadingMode = .document {
+        didSet {
+            guard mode != oldValue else { return }
+            stopFollowing()
+            frames.stop()
+            panel.clear()
+            if mode == .document { refreshPanel() }
+        }
+    }
+    let frames: FrameReader
     let browsers: [BrowserChoice]
     @Published var browserBundleID: String {
         didSet {
@@ -41,6 +51,7 @@ import UniformTypeIdentifiers
         try await SourceDocumentLoader.load(url)
     }) {
         self.loadDocument = loadDocument
+        frames = FrameReader(panel: panel)
         let installed = BrowserChoice.installed()
         browsers = installed
         let saved = UserDefaults.standard.string(forKey: "browserBundleID") ?? BrowserChoice.defaultID()
@@ -86,6 +97,8 @@ import UniformTypeIdentifiers
 
     func open(_ url: URL) {
         guard !translating else { return }
+        frames.stop()
+        mode = .document
         stopFollowing()
         loadingTask?.cancel()
         let id = UUID()
@@ -128,18 +141,18 @@ import UniformTypeIdentifiers
     // MARK: Translation
 
     func chooseModel() {
-        guard !translating, !loading else { return }
+        guard !translating, !loading, !frames.running else { return }
         let panel = NSOpenPanel()
         panel.title = "PLaMo 3 Translate の GGUF を選択"
         if panel.runModal() == .OK, let url = panel.url {
             model = url
             UserDefaults.standard.set(url.path, forKey: "modelPath")
-            if let documentURL { open(documentURL) }
+            if mode == .document, let documentURL { open(documentURL) }
         }
     }
 
     func translateAll() {
-        guard !translating, !loading, let document else { return }
+        guard mode == .document, !frames.running, !translating, !loading, let document else { return }
         guard let model, FileManager.default.fileExists(atPath: model.path) else {
             status = "翻訳モデル（GGUF）を選んでください。"
             return
@@ -253,7 +266,7 @@ import UniformTypeIdentifiers
     func toggleFollowing() { following ? stopFollowing() : startFollowing() }
 
     private func startFollowing() {
-        guard !loading, let document else { return }
+        guard mode == .document, !loading, let document else { return }
         let id = loadID
         let titles = [document.title, documentURL?.lastPathComponent, documentURL?.absoluteString].compactMap { $0 }.filter { !$0.isEmpty }
         if isHTML, NSWorkspace.shared.urlForApplication(withBundleIdentifier: browserBundleID) == nil {
@@ -313,6 +326,7 @@ import UniformTypeIdentifiers
         loadingTask?.cancel()
         run?.cancel()
         follower?.stop()
+        frames.stop()
         server.stop()
     }
 }
