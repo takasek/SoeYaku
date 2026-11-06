@@ -9,6 +9,7 @@ import SoeYakuCore
     private let footer = NSTextField(wrappingLabelWithString: "")
     private var reading: ReadingText?
     private var highlighted: Int?
+    var window: NSWindow { panel }
     var fontSize: CGFloat = 18 { didSet { if oldValue != fontSize, let reading { display(reading) } } }
 
     init() {
@@ -22,6 +23,7 @@ import SoeYakuCore
         panel.isReleasedWhenClosed = false
         panel.minSize = NSSize(width: 260, height: 200)
         panel.collectionBehavior = [.fullScreenAuxiliary]
+        panel.isExcludedFromWindowsMenu = false
 
         textView.isEditable = false
         textView.isSelectable = true
@@ -63,7 +65,10 @@ import SoeYakuCore
         textView.frame = NSRect(origin: .zero, size: scrollView.contentSize)
     }
 
-    func show() { panel.orderFrontRegardless() }
+    func show(focus: Bool = false) {
+        if focus { panel.makeKeyAndOrderFront(nil) }
+        else { panel.orderFrontRegardless() }
+    }
 
     func clear() {
         reading = nil
@@ -93,12 +98,14 @@ import SoeYakuCore
 
     func highlight(sentence: Int, source: String) {
         footer.stringValue = "原文: " + source
-        guard sentence != highlighted, let reading, reading.runs.indices.contains(sentence) else { return }
-        if let highlighted, reading.runs.indices.contains(highlighted) {
-            textView.textStorage?.removeAttribute(.backgroundColor, range: reading.runs[highlighted].range)
+        guard let reading, reading.runs.indices.contains(sentence) else { return }
+        if sentence != highlighted {
+            if let highlighted, reading.runs.indices.contains(highlighted) {
+                textView.textStorage?.removeAttribute(.backgroundColor, range: reading.runs[highlighted].range)
+            }
+            highlighted = sentence
+            paint(sentence)
         }
-        highlighted = sentence
-        paint(sentence)
         reveal(reading.runs[sentence].range)
     }
 

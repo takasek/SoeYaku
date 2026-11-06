@@ -223,7 +223,7 @@ import UniformTypeIdentifiers
     private func startFollowing() {
         guard !loading, let document else { return }
         let id = loadID
-        let follower = WindowFollower(document: document)
+        let follower = WindowFollower(document: document, excludedWindows: [panel.window], documentName: documentURL?.lastPathComponent)
         follower.onResult = { [weak self] result in
             guard let self, self.loadID == id else { return }
             self.show(result)
@@ -262,7 +262,7 @@ import UniformTypeIdentifiers
         }
     }
 
-    func showPanel() { panel.show() }
+    func showPanel() { panel.show(focus: true) }
 
     private func refreshPanel() {
         guard let document else { return }

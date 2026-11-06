@@ -32,6 +32,16 @@ import SwiftUI
         for (title, action, key) in [("コピー", "copy:", "c"), ("すべてを選択", "selectAll:", "a")] {
             edit.submenu?.addItem(withTitle: title, action: Selector(action), keyEquivalent: key)
         }
+        let windows = NSMenuItem()
+        let windowsMenu = NSMenu(title: "ウインドウ")
+        windows.submenu = windowsMenu
+        windowsMenu.addItem(withTitle: "操作ウインドウ", action: #selector(showControls), keyEquivalent: "1").target = self
+        windowsMenu.addItem(withTitle: "訳文ウインドウ", action: #selector(showTranslation), keyEquivalent: "2").target = self
+        windowsMenu.addItem(.separator())
+        windowsMenu.addItem(withTitle: "しまう", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+        windowsMenu.addItem(withTitle: "すべてを手前に移動", action: #selector(NSApplication.arrangeInFront(_:)), keyEquivalent: "")
+        menu.addItem(windows)
+        NSApp.windowsMenu = windowsMenu
         NSApp.mainMenu = menu
 
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 580, height: 560),
@@ -53,6 +63,8 @@ import SwiftUI
     }
 
     @objc private func openDocument() { reader.choosePDF() }
+    @objc private func showControls() { window.makeKeyAndOrderFront(nil) }
+    @objc private func showTranslation() { reader.showPanel() }
 
     func application(_ application: NSApplication, open urls: [URL]) {
         if let pdf = urls.first(where: { $0.pathExtension.lowercased() == "pdf" }) { reader.open(pdf) }
