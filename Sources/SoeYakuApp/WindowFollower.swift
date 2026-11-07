@@ -85,8 +85,7 @@ import UniformTypeIdentifiers
                   (info[kCGWindowAlpha as String] as? Double ?? 1) > 0 else { continue }
             if (info[kCGWindowLayer as String] as? Int) == Int(CGWindowLevelForKey(.cursorWindow)),
                info[kCGWindowOwnerName as String] as? String == "Window Server" { continue }
-            guard let bounds = info[kCGWindowBounds as String] as? NSDictionary,
-                  let frame = CGRect(dictionaryRepresentation: bounds as CFDictionary), frame.contains(point) else { continue }
+            guard let frame = Self.frame(of: info), frame.contains(point) else { continue }
             // A normal-level translation window behind the reader must not block following.
             return number == viewerWindowID ? pointer : nil
         }
@@ -122,6 +121,15 @@ import UniformTypeIdentifiers
         return Self.frontDocumentWindow(in: list, pid: pid, documentName: documentName)
     }
 
+    private static func isNormalWindow(_ info: [String: Any], pid: pid_t) -> Bool {
+        (info[kCGWindowOwnerPID as String] as? pid_t) == pid && (info[kCGWindowLayer as String] as? Int) == 0
+    }
+
+    private static func frame(of info: [String: Any]) -> CGRect? {
+        guard let bounds = info[kCGWindowBounds as String] as? NSDictionary else { return nil }
+        return CGRect(dictionaryRepresentation: bounds as CFDictionary)
+    }
+
     static func frontBrowserWindow(in list: [[String: Any]], pid: pid_t, titles: [String]) -> (CGWindowID, CGRect)? {
         let suffixes = ["Google Chrome", "Mozilla Firefox", "Microsoft Edge", "Brave", "Safari", "Arc"]
         func normalized(_ title: String) -> String {
@@ -134,10 +142,9 @@ import UniformTypeIdentifiers
             return value.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         }
         let expected = Set(titles.map(normalized).filter { !$0.isEmpty })
-        for info in list where (info[kCGWindowOwnerPID as String] as? pid_t) == pid && (info[kCGWindowLayer as String] as? Int) == 0 {
+        for info in list where isNormalWindow(info, pid: pid) {
             guard let number = info[kCGWindowNumber as String] as? CGWindowID,
-                  let bounds = info[kCGWindowBounds as String] as? NSDictionary,
-                  let frame = CGRect(dictionaryRepresentation: bounds as CFDictionary), frame.width >= 300, frame.height >= 200,
+                  let frame = frame(of: info), frame.width >= 300, frame.height >= 200,
                   let title = info[kCGWindowName as String] as? String else { continue }
             // Match only the front normal browser window; never follow a matching page behind another one.
             return expected.contains(normalized(title)) ? (number, frame) : nil
@@ -146,10 +153,9 @@ import UniformTypeIdentifiers
     }
 
     static func frontDocumentWindow(in list: [[String: Any]], pid: pid_t, documentName: String?) -> (CGWindowID, CGRect)? {
-        for info in list where (info[kCGWindowOwnerPID as String] as? pid_t) == pid && (info[kCGWindowLayer as String] as? Int) == 0 {
+        for info in list where isNormalWindow(info, pid: pid) {
             guard let number = info[kCGWindowNumber as String] as? CGWindowID,
-                  let bounds = info[kCGWindowBounds as String] as? NSDictionary,
-                  let frame = CGRect(dictionaryRepresentation: bounds as CFDictionary),
+                  let frame = frame(of: info),
                   let title = info[kCGWindowName as String] as? String,
                   let type = UTType(filenameExtension: (title as NSString).pathExtension),
                   type.conforms(to: .pdf) || type.conforms(to: .image) else { continue }
