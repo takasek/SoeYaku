@@ -90,10 +90,8 @@ struct ControlView: View {
             } else {
                 GroupBox {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text(reader.mode == .frameText ? "枠内の訳を連続テキストで読む" : "枠の画像と訳を同じ比率で見る").font(.headline)
-                        Text(reader.mode == .frameText
-                             ? "細長い範囲も選べます。訳は読み順に並び、訳文窓の幅で折り返します。"
-                             : "選んだ枠の画像を別窓に複製し、原文の位置へ訳を重ねます。窓の縦横比は枠と揃えます。")
+                        Text(reader.mode.frameStyle?.title ?? "").font(.headline)
+                        Text(reader.mode.frameStyle?.summary ?? "")
                             .font(.callout).foregroundStyle(.secondary)
                         HStack {
                             Button(frames.region == nil ? "枠を選ぶ…" : "枠を選び直す…") { frames.chooseRegion() }
@@ -117,7 +115,7 @@ struct ControlView: View {
                     }.padding(6)
                 }
             }
-            if reader.mode != .frameImage {
+            if reader.mode.usesFontSize {
             HStack {
                 Image(systemName: "textformat.size").accessibilityLabel("訳文の文字サイズ")
                 Slider(value: $reader.fontSize, in: 12...40, step: 1)
@@ -132,7 +130,7 @@ struct ControlView: View {
                 Spacer()
             }
             HStack {
-                Text(reader.mode == .document ? "画面の文字は現在地を探すためだけに読み、保存しません。" : "選んだ画面範囲を翻訳します。画像・原文・訳は保存しません。")
+                Text(reader.mode.privacyNote)
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button("訳文ウインドウ") { reader.showPanel() }.disabled(reader.mode == .document ? reader.document == nil : frames.region == nil)
@@ -148,5 +146,32 @@ struct ControlView: View {
             }
         }
         .padding(22).frame(minWidth: 560, idealWidth: 580, alignment: .topLeading)
+    }
+}
+
+// The texts are LocalizedStringKey, as the literals passed to Text were: Text typesets a plain String differently.
+private extension ReadingMode {
+    /// What the mode reads from the screen and that none of it is kept.
+    var privacyNote: LocalizedStringKey {
+        switch self {
+        case .document: "画面の文字は現在地を探すためだけに読み、保存しません。"
+        case .frameText, .frameImage: "選んだ画面範囲を翻訳します。画像・原文・訳は保存しません。"
+        }
+    }
+}
+
+private extension FrameStyle {
+    var title: LocalizedStringKey {
+        switch self {
+        case .text: "枠内の訳を連続テキストで読む"
+        case .image: "枠の画像と訳を同じ比率で見る"
+        }
+    }
+
+    var summary: LocalizedStringKey {
+        switch self {
+        case .text: "細長い範囲も選べます。訳は読み順に並び、訳文窓の幅で折り返します。"
+        case .image: "選んだ枠の画像を別窓に複製し、原文の位置へ訳を重ねます。窓の縦横比は枠と揃えます。"
+        }
     }
 }
