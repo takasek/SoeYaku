@@ -69,4 +69,17 @@ struct GlossaryTests {
         let glossary = try Glossary.parse("speech recognition = 音声認識", name: "g.txt")
         #expect(glossary.kikiyakuText(appliedTo: ["speech", "recognition"]) == "")
     }
+
+    @Test func loadExistingSkipsMissingFilesAndKeepsOverlayOrder() throws {
+        let folder = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let common = folder.appending(path: "common.tsv"), document = folder.appending(path: "document.tsv")
+        try "agent = エージェント\nspeech = 音声".write(to: common, atomically: true, encoding: .utf8)
+        try "Agent = 代理人".write(to: document, atomically: true, encoding: .utf8)
+        let missing = folder.appending(path: "missing.tsv")
+        let glossary = try Glossary.loadExisting([missing, common, missing, document])
+        #expect(glossary.terms == [GlossaryTerm("speech", "音声"), GlossaryTerm("Agent", "代理人")])
+        #expect(try Glossary.loadExisting([missing]).terms.isEmpty)
+    }
 }

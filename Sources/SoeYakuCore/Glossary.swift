@@ -64,6 +64,11 @@ public struct Glossary: Sendable, Equatable {
         return glossary
     }
 
+    /// Like `load`, but files that do not exist are skipped, for optional glossaries the user may not have created.
+    public static func loadExisting(_ files: [URL]) throws -> Glossary {
+        try load(files.filter { FileManager.default.fileExists(atPath: $0.path) })
+    }
+
     public func matches(in text: String) -> [GlossaryTerm] {
         terms.filter { $0.occurs(in: text) }
     }
