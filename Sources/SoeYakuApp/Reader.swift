@@ -46,7 +46,12 @@ import UniformTypeIdentifiers
 
     var translatedCount: Int { translations.lazy.compactMap { $0 }.count }
     var isHTML: Bool { documentURL.flatMap { try? SourceDocumentLoader.format(of: $0) } == .html }
-    var viewerName: String { isHTML ? "ブラウザ" : "プレビュー" }
+    /// Preview for a PDF, or the chosen browser for HTML. Without a document it is Preview.
+    var viewer: Viewer {
+        guard isHTML else { return .preview(documentName: documentURL?.lastPathComponent) }
+        let titles = [document?.title, documentURL?.lastPathComponent, documentURL?.absoluteString].compactMap { $0 }.filter { !$0.isEmpty }
+        return .browser(bundleID: browserBundleID, titles: titles)
+    }
 
     init(loadDocument: @escaping @Sendable (URL) async throws -> SourceDocument = { url in
         try await SourceDocumentLoader.load(url)
@@ -135,8 +140,8 @@ import UniformTypeIdentifiers
 
     func openInViewer() {
         guard let documentURL,
-              let viewer = NSWorkspace.shared.urlForApplication(withBundleIdentifier: isHTML ? browserBundleID : WindowFollower.previewBundleID) else { return }
-        NSWorkspace.shared.open([documentURL], withApplicationAt: viewer, configuration: NSWorkspace.OpenConfiguration())
+              let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: viewer.bundleID) else { return }
+        NSWorkspace.shared.open([documentURL], withApplicationAt: app, configuration: NSWorkspace.OpenConfiguration())
     }
 
     // MARK: Translation
@@ -265,14 +270,12 @@ import UniformTypeIdentifiers
     private func startFollowing() {
         guard mode == .document, !loading, let document else { return }
         let id = loadID
-        let titles = [document.title, documentURL?.lastPathComponent, documentURL?.absoluteString].compactMap { $0 }.filter { !$0.isEmpty }
-        if isHTML, NSWorkspace.shared.urlForApplication(withBundleIdentifier: browserBundleID) == nil {
+        let viewer = self.viewer
+        if case .browser(let bundleID, _) = viewer, NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) == nil {
             status = "閲覧するブラウザを選んでください。"
             return
         }
-        let follower = WindowFollower(document: document, bundleID: isHTML ? browserBundleID : WindowFollower.previewBundleID,
-                                      excludedWindows: [panel.window], documentName: documentURL?.lastPathComponent,
-                                      browserTitles: isHTML ? titles : nil)
+        let follower = WindowFollower(document: document, viewer: viewer, excludedWindows: [panel.window])
         follower.onResult = { [weak self] result in
             guard let self, self.loadID == id else { return }
             self.show(result)
@@ -286,8 +289,8 @@ import UniformTypeIdentifiers
             self.follower = follower
             following = true
             panel.show()
-            panel.setFooter("\(viewerName)で読みたい文にポインターを置いてください。")
-            status = "\(viewerName)の表示に追従しています。ポインターの下の文の訳を強調します。"
+            panel.setFooter("\(viewer.name)で読みたい文にポインターを置いてください。")
+            status = "\(viewer.name)の表示に追従しています。ポインターの下の文の訳を強調します。"
         } catch {
             status = error.localizedDescription
         }

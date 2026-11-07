@@ -7,10 +7,7 @@ import UniformTypeIdentifiers
 /// Reads the front window of the viewer app and reports which sentence is under the pointer.
 /// It captures only that window, and only while the viewer is the active app and the pointer is inside the window.
 @MainActor final class WindowFollower {
-    static let previewBundleID = "com.apple.Preview"
-    private let bundleID: String
-    private let documentName: String?
-    private let browserTitles: [String]?
+    private let viewer: Viewer
     private var locator: Locator
     private var task: Task<Void, Never>?
     private var window: SCWindow?
@@ -20,10 +17,8 @@ import UniformTypeIdentifiers
     var onResult: ((LocateResult) -> Void)?
     var onProblem: ((String) -> Void)?
 
-    init(document: SourceDocument, bundleID: String = WindowFollower.previewBundleID, excludedWindows: [NSWindow] = [], documentName: String? = nil, browserTitles: [String]? = nil) {
-        self.bundleID = bundleID
-        self.documentName = documentName
-        self.browserTitles = browserTitles
+    init(document: SourceDocument, viewer: Viewer = .preview(documentName: nil), excludedWindows: [NSWindow] = []) {
+        self.viewer = viewer
         self.excludedWindows = excludedWindows
         locator = Locator(index: DocumentIndex(document))
     }
@@ -48,7 +43,7 @@ import UniformTypeIdentifiers
     }
 
     private func tick() async {
-        guard let app = NSWorkspace.shared.frontmostApplication, app.bundleIdentifier == bundleID else { return }
+        guard let app = NSWorkspace.shared.frontmostApplication, app.bundleIdentifier == viewer.bundleID else { return }
         let list = Self.onScreenWindows()
         guard let (windowID, frame) = frontWindow(of: app.processIdentifier, in: list) else { return }
         let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
@@ -119,8 +114,7 @@ import UniformTypeIdentifiers
     /// The topmost normal window of the process, with its frame in global top-left coordinates.
     private func frontWindow(of pid: pid_t, in list: [[String: Any]]?) -> (CGWindowID, CGRect)? {
         guard let list else { return nil }
-        if let browserTitles { return Self.frontBrowserWindow(in: list, pid: pid, titles: browserTitles) }
-        return Self.frontDocumentWindow(in: list, pid: pid, documentName: documentName)
+        return viewer.frontWindow(in: list, pid: pid)
     }
 
     private static func onScreenWindows() -> [[String: Any]]? {

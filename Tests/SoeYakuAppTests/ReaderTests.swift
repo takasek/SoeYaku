@@ -82,7 +82,7 @@ import Testing
         #expect(reader.document?.title == "Article")
         #expect(reader.document?.sentences.map(\.text) == ["The first paragraph.", "The second paragraph."])
         #expect(reader.isHTML)
-        #expect(reader.viewerName == "ブラウザ")
+        #expect(reader.viewer == .browser(bundleID: reader.browserBundleID, titles: ["Article", file.lastPathComponent, file.absoluteString]))
         #expect(reader.documentURL == file)
         #expect(reader.translations == [nil, nil])
         reader.shutdown()

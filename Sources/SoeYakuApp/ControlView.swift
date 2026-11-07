@@ -31,7 +31,7 @@ struct ControlView: View {
                         Spacer()
                         Button("PDF・HTML を開く…") { reader.chooseDocument() }.disabled(reader.translating)
                         Button("URL を開く…") { reader.chooseURL() }.disabled(reader.translating)
-                        Button("\(reader.viewerName)で開く") { reader.openInViewer() }.disabled(reader.documentURL == nil)
+                        Button("\(reader.viewer.name)で開く") { reader.openInViewer() }.disabled(reader.documentURL == nil)
                     }
                     if reader.isHTML {
                         Picker("ブラウザ", selection: $reader.browserBundleID) {
@@ -137,7 +137,7 @@ struct ControlView: View {
                 Spacer()
                 Button("訳文ウインドウ") { reader.showPanel() }.disabled(reader.mode == .document ? reader.document == nil : frames.region == nil)
                 if reader.mode == .document {
-                Button(reader.following ? "追従を止める" : "\(reader.viewerName)に追従") { reader.toggleFollowing() }
+                Button(reader.following ? "追従を止める" : "\(reader.viewer.name)に追従") { reader.toggleFollowing() }
                     .buttonStyle(.borderedProminent).tint(reader.following ? .gray : accent).disabled(reader.document == nil)
                 } else {
                     Button(frames.running ? "翻訳を止める" : "枠の翻訳を開始") {
