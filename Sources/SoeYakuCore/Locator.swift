@@ -205,7 +205,8 @@ public struct Locator: Sendable {
         var positions: [[Int]] = []
         for (k, entry) in lines.enumerated() {
             let previous = k > 0 ? lines[k - 1].text.trimmingCharacters(in: .whitespaces) : ""
-            let joins = previous.hasSuffix("-") && previous.dropLast().last?.isLetter == true && !query.isEmpty
+            let next = entry.text.drop { $0.isWhitespace }
+            let joins = Hyphenation.continues(previous, into: next) && !query.isEmpty
             var linePositions: [Int] = []
             for (offset, token) in entry.tokens.enumerated() {
                 if offset == 0 && joins {

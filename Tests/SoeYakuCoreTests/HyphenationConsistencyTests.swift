@@ -38,4 +38,10 @@ struct HyphenationConsistencyTests {
         #expect(blocks.count == 1, "the two lines must form one block")
         #expect(TextNormalizer.tokens(blocks.first?.text ?? "") == readingOrderTokens(c))
     }
+
+    @Test(arguments: cases)
+    func locatorQueryTokenizesLikeReadingOrder(_ c: Case) {
+        let lines = [c.first, c.second].map { (text: $0, tokens: TextNormalizer.tokens($0)) }
+        #expect(Locator.joinedQuery(lines).0 == readingOrderTokens(c))
+    }
 }
