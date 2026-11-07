@@ -17,4 +17,9 @@ struct TextNormalizerTests {
     @Test func returnsNoTokensForPunctuationOnly() {
         #expect(TextNormalizer.tokens(" — … ").isEmpty)
     }
+
+    @Test func collapsingWhitespaceFoldsCompatibilityCharactersAndCollapsesRuns() {
+        #expect(TextNormalizer.collapsingWhitespace("  ＡＢＣ \t ﬁne\n\n x  ") == "ABC fine x")
+        #expect(TextNormalizer.collapsingWhitespace(" \n\t ") == "")
+    }
 }

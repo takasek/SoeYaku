@@ -23,4 +23,9 @@ public enum TextNormalizer {
         }
         return tokens
     }
+
+    /// NFKC with every run of whitespace collapsed to one space and the ends trimmed.
+    public static func collapsingWhitespace(_ text: String) -> String {
+        text.precomposedStringWithCompatibilityMapping.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
 }
