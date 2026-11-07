@@ -1,6 +1,6 @@
 # ローカル翻訳モデルの準備
 
-SoeYaku は Mac 上で動く PLaMo 3 Translate に英語の文を1文ずつ渡し、日本語訳を文書ごとに保存します。手順と設定は前身の試作 Local Caption（非公開、検証版 `090b967`）と同じです。モデルの取得後は、翻訳にインターネット接続を使いません。
+SoeYaku は Mac 上で動く PLaMo 3 Translate に英語の文を1文ずつ渡し、日本語訳を文書ごとに保存します。モデルの取得後は、翻訳にインターネット接続を使いません。
 
 ## 2B モデルを用意する
 
@@ -16,7 +16,7 @@ printf '%s  %s\n' 2c288ecc7ebfe60c3561726580da3583767f3c41ca3ef5c6825bf6c4cc0607
   | shasum -a 256 -c - && mv "$model.partial" "$model"
 ```
 
-ダウンロードは約 1.81 GB です。Local Caption で取得済みなら、同じファイルを `local/models/` にコピーするかシンボリックリンクを張れば足ります。モデルの使用条件と配布条件は [配布元のモデルカード](https://huggingface.co/pfnet/plamo-3-translate-2b-GGUF) を参照してください。`local/models/` 以外に置いた場合は、アプリの「モデル…」で GGUF を選びます。
+ダウンロードは約 1.81 GB です。同じモデルを取得済みなら、`local/models/` にコピーするかシンボリックリンクを張れば足ります。モデルの使用条件と配布条件は [配布元のモデルカード](https://huggingface.co/pfnet/plamo-3-translate-2b-GGUF) を参照してください。`local/models/` 以外に置いた場合は、アプリの「モデル…」で GGUF を選びます。
 
 ## サーバーを手動で起動する
 
