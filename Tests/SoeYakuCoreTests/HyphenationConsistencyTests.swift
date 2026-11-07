@@ -3,8 +3,7 @@ import Testing
 
 @testable import SoeYakuCore
 
-/// The PDF paragraph, the frame paragraph and the locator's OCR query must tokenize a two-line text alike,
-/// because the PDF index is built from the ReadingOrder text and the other two are matched against it.
+/// The PDF paragraph, the frame paragraph and the locator's OCR query must tokenize a two-line text alike, because the PDF index is built from the ReadingOrder text and the other two are matched against it.
 struct HyphenationConsistencyTests {
     struct Case: Sendable, CustomTestStringConvertible {
         let first: String

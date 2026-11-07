@@ -193,7 +193,7 @@ public struct Locator: Sendable {
         return Array(sameColumn[lower...upper])
     }
 
-    /// A line ending in a letter and "-" continues with the first token of the next line.
+    /// A line that `Hyphenation` says continues on the next line is joined with that line's first token.
     private func joinedQuery(_ column: [Candidate]) -> ([String], [[Int]]) {
         Self.joinedQuery(column.map { (text: $0.line.text, tokens: $0.tokens) })
     }
