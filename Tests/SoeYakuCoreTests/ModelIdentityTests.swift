@@ -18,4 +18,12 @@ struct ModelIdentityTests {
         try Data("third".utf8).write(to: first)
         #expect(original != (try ModelIdentity.forFile(first)))
     }
+
+    @Test func identityIsTheLowercaseSHA256HexOfTheContents() throws {
+        let url = FileManager.default.temporaryDirectory.appending(path: "golden-\(UUID().uuidString).gguf")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try Data("abc".utf8).write(to: url)
+        #expect(try ModelIdentity.forFile(url)
+            == "sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+    }
 }
