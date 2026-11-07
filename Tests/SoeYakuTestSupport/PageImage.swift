@@ -8,15 +8,21 @@ import UniformTypeIdentifiers
 public enum PageImage {
     public struct RenderError: Error {}
 
-    /// The page drawn on white at `scale` pixels per point.
-    public static func render(_ page: PDFPage, scale: CGFloat = 2) throws -> CGImage {
-        let box = page.bounds(for: .mediaBox)
-        let width = Int((box.width * scale).rounded()), height = Int((box.height * scale).rounded())
+    /// An RGB context of the given pixel size, already filled with white.
+    public static func whiteCanvas(width: Int, height: Int) throws -> CGContext {
         guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
                                       space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
         else { throw RenderError() }
         context.setFillColor(CGColor(gray: 1, alpha: 1))
         context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        return context
+    }
+
+    /// The page drawn on white at `scale` pixels per point.
+    public static func render(_ page: PDFPage, scale: CGFloat = 2) throws -> CGImage {
+        let box = page.bounds(for: .mediaBox)
+        let width = Int((box.width * scale).rounded()), height = Int((box.height * scale).rounded())
+        let context = try whiteCanvas(width: width, height: height)
         context.scaleBy(x: scale, y: scale)
         page.draw(with: .mediaBox, to: context)
         guard let image = context.makeImage() else { throw RenderError() }
