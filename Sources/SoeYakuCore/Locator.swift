@@ -185,9 +185,7 @@ public struct Locator: Sendable {
         let anchorBox = anchor.line.box
         let sameColumn = candidates.filter { other in
             if other.id == anchor.id { return true }
-            let overlap = min(anchorBox.maxX, other.line.box.maxX) - max(anchorBox.minX, other.line.box.minX)
-            let narrower = min(anchorBox.width, other.line.box.width)
-            return overlap >= 0.5 * narrower
+            return ScreenGeometry.sharesColumn(anchorBox, other.line.box)
         }.sorted { $0.line.box.midY < $1.line.box.midY }
         let anchorIndex = sameColumn.firstIndex { $0.id == anchor.id } ?? 0
         let lower = max(0, anchorIndex - 2)
