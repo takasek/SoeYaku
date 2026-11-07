@@ -60,11 +60,18 @@ enum ReadingMode: String, CaseIterable, Identifiable {
                 try await observe(region: region, style: style, engine: engine)
             } catch is CancellationError {
             } catch {
-                if revision == id { status = error.localizedDescription; panel.setFooter(status) }
+                if revision == id { report(error.localizedDescription) }
             }
             guard revision == id else { return }
             server.stop(); running = false; task = nil
         }
+    }
+
+    private static let emptyFrameMessage = "枠内に英語の文字が見つかりません。"
+
+    private func report(_ text: String) {
+        status = text
+        panel.setFooter(text)
     }
 
     func stop() {
@@ -96,15 +103,13 @@ enum ReadingMode: String, CaseIterable, Identifiable {
             guard revision == id else { return }
             if blocks != lastBlocks {
                 present(image, blocks: blocks, translations: [], style: style, resetScroll: true)
-                status = blocks.isEmpty ? "枠内に英語の文字が見つかりません。" : "枠内の \(blocks.count) 段落を翻訳しています…"
-                panel.setFooter(status)
+                report(blocks.isEmpty ? Self.emptyFrameMessage : "枠内の \(blocks.count) 段落を翻訳しています…")
                 let translated: [String]
                 do { translated = try await engine.translate(blocks) }
                 catch is CancellationError { throw CancellationError() }
                 catch {
                     guard revision == id else { return }
-                    status = "この画面の翻訳に失敗しました。画面が変わると再試行します。 " + error.localizedDescription
-                    panel.setFooter(status)
+                    report("この画面の翻訳に失敗しました。画面が変わると再試行します。 " + error.localizedDescription)
                     lastImage = data; lastBlocks = nil; lastTranslations = []
                     try await Task.sleep(for: .milliseconds(600))
                     continue
@@ -114,8 +119,7 @@ enum ReadingMode: String, CaseIterable, Identifiable {
                 lastTranslations = translated
             }
             present(image, blocks: blocks, translations: lastTranslations, style: style)
-            status = blocks.isEmpty ? "枠内に英語の文字が見つかりません。" : "\(blocks.count) 段落を翻訳しました。画面が変わると更新します。"
-            panel.setFooter(status)
+            report(blocks.isEmpty ? Self.emptyFrameMessage : "\(blocks.count) 段落を翻訳しました。画面が変わると更新します。")
             lastImage = data; lastBlocks = blocks
             try await Task.sleep(for: .milliseconds(600))
         }
