@@ -28,8 +28,7 @@ public enum FrameText {
                box.minY - p.maxY < max(p.height, box.height) * 0.9,
                abs(box.height - p.height) < p.height * 0.35,
                min(box.maxX, p.maxX) - max(box.minX, p.minX) >= min(box.width, p.width) * 0.5 {
-                let text = last.text.hasSuffix("-") && line.text.first?.isLowercase == true
-                    ? String(last.text.dropLast()) + line.text : last.text + " " + line.text
+                let text = Hyphenation.join(last.text, line.text)
                 result[result.count - 1] = FrameBlock(text: text, box: last.box.union(box))
             } else {
                 result.append(FrameBlock(text: line.text, box: box))
