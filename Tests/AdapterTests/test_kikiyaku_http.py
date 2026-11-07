@@ -1,4 +1,3 @@
-import copy
 from http.server import HTTPServer
 import json
 from pathlib import Path

@@ -1,5 +1,4 @@
 import Foundation
-import SoeYakuCore
 
 /// Glossary files the app creates for the user to edit; their locations come from `StoragePaths`, shared with soeyaku-cli.
 enum Storage {
