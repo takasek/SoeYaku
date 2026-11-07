@@ -18,19 +18,23 @@ public struct ReadingText: Equatable, Sendable {
         var string = ""
         var runs: [Run] = []
         var paragraph: Int?
+        var offset = 0
         for sentence in document.sentences {
             let translation = sentence.id < translations.count ? translations[sentence.id] : nil
             let text = translation ?? sentence.text
             if let paragraph, paragraph != sentence.paragraph {
                 string += "\n"
+                offset += 1
             } else if let last = string.unicodeScalars.last, !Self.isFullWidth(last), paragraph != nil {
                 string += " "
+                offset += 1
             }
             paragraph = sentence.paragraph
-            let start = string.utf16.count
+            let length = text.utf16.count
             string += text
-            runs.append(Run(sentence: sentence.id, range: NSRange(location: start, length: text.utf16.count),
+            runs.append(Run(sentence: sentence.id, range: NSRange(location: offset, length: length),
                             translated: translation != nil))
+            offset += length
         }
         self.string = string
         self.runs = runs
