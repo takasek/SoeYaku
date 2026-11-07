@@ -3,16 +3,13 @@ import CoreText
 import Foundation
 import Testing
 import SoeYakuCore
+import SoeYakuTestSupport
 @testable import SoeYakuVision
 
 struct TextRecognizerTests {
     /// White image with black Helvetica lines; `y` is measured from the top of the image in pixels.
     private func image(width: Int, height: Int, lines: [(text: String, x: CGFloat, y: CGFloat)]) throws -> CGImage {
-        let context = try #require(CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
-                                             space: CGColorSpaceCreateDeviceRGB(),
-                                             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
-        context.setFillColor(CGColor(gray: 1, alpha: 1))
-        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        let context = try PageImage.whiteCanvas(width: width, height: height)
         let font = CTFontCreateWithName("Helvetica" as CFString, 28, nil)
         for line in lines {
             let text = NSAttributedString(string: line.text, attributes: [NSAttributedString.Key(kCTFontAttributeName as String): font])

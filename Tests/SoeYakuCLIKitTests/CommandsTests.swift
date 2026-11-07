@@ -134,10 +134,7 @@ struct CommandsTests {
         let pdf = try MainFixture.write(rightColumnFirst: false)
         let png = pdf.deletingLastPathComponent().appending(path: "blank.png")
         defer { try? FileManager.default.removeItem(at: pdf.deletingLastPathComponent()) }
-        let context = try #require(CGContext(data: nil, width: 300, height: 200, bitsPerComponent: 8, bytesPerRow: 0,
-                                             space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
-        context.setFillColor(CGColor(gray: 1, alpha: 1))
-        context.fill(CGRect(x: 0, y: 0, width: 300, height: 200))
+        let context = try PageImage.whiteCanvas(width: 300, height: 200)
         try PageImage.writePNG(try #require(context.makeImage()), to: png)
         #expect(try await CLI.locateLine(file: pdf, image: png, pointer: CGPoint(x: 10, y: 10)) == #"{"status":"unresolved"}"#)
     }

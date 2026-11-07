@@ -31,10 +31,7 @@ private struct Window {
         let pageImage = try PageImage.render(page, scale: Self.scale)
         let cropped = try #require(pageImage.cropping(to: crop))
         let height = cropped.height + Self.toolbarHeight
-        let context = try #require(CGContext(data: nil, width: cropped.width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
-                                             space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
-        context.setFillColor(CGColor(gray: 1, alpha: 1))
-        context.fill(CGRect(x: 0, y: 0, width: cropped.width, height: height))
+        let context = try PageImage.whiteCanvas(width: cropped.width, height: height)
         context.draw(cropped, in: CGRect(x: 0, y: 0, width: cropped.width, height: cropped.height))
         let font = CTFontCreateWithName("Helvetica" as CFString, 28, nil)
         let toolbar = NSAttributedString(string: "File Edit View Go Tools Window Help",
