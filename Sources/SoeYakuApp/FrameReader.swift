@@ -6,6 +6,20 @@ import SoeYakuVision
 enum ReadingMode: String, CaseIterable, Identifiable {
     case document = "文書", frameText = "枠1・テキスト", frameImage = "枠2・画像と訳"
     var id: Self { self }
+
+    /// How a frame mode shows its translation; the document mode has none.
+    var frameStyle: FrameStyle? {
+        switch self {
+        case .document: nil
+        case .frameText: .text
+        case .frameImage: .image
+        }
+    }
+}
+
+/// How the translation of a screen region is shown: as continuous text, or over a copy of the region's image.
+enum FrameStyle {
+    case text, image
 }
 
 @MainActor final class FrameReader: ObservableObject {
