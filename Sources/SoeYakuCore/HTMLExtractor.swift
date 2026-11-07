@@ -19,7 +19,7 @@ public enum HTMLExtractor {
     public static func extract(data: Data, fallbackTitle: String, textEncodingName: String? = nil) throws -> SourceDocument {
         let html = try decode(data, encodingName: textEncodingName)
         let dom = try SwiftSoup.parseHTML(html)
-        let title = normalized(try dom.title())
+        let title = TextNormalizer.collapsingWhitespace(try dom.title())
         try dom.select("head, script, style, template, noscript, nav, aside, form, button, input, select, textarea, svg, canvas, [hidden], [inert]").remove()
         for element in try dom.select("[aria-hidden], [style]") {
             if try element.attr("aria-hidden").lowercased() == "true" || hiddenStyle(element.attr("style")) {
@@ -32,7 +32,7 @@ public enum HTMLExtractor {
         var paragraphs: [String] = []
         var text = ""
         func flush() {
-            let paragraph = normalized(text)
+            let paragraph = TextNormalizer.collapsingWhitespace(text)
             if !paragraph.isEmpty { paragraphs.append(paragraph) }
             text = ""
         }
@@ -70,10 +70,6 @@ public enum HTMLExtractor {
         "html", "body", "main", "article", "section", "div", "p", "h1", "h2", "h3", "h4", "h5", "h6",
         "li", "dt", "dd", "tr", "pre", "blockquote", "figcaption", "address", "ul", "ol", "dl", "table", "header", "footer"
     ]
-
-    private static func normalized(_ string: String) -> String {
-        string.precomposedStringWithCompatibilityMapping.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-    }
 
     private static func hiddenStyle(_ style: String) -> Bool {
         style.lowercased().split(separator: ";").contains { declaration in

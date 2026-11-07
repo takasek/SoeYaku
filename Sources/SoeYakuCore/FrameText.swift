@@ -11,7 +11,7 @@ public struct FrameBlock: Sendable, Equatable {
 public enum FrameText {
     public static func blocks(from input: some Sequence<TextLine>) -> [FrameBlock] {
         let lines = input.compactMap { line -> PageLine? in
-            let text = line.text.precomposedStringWithCompatibilityMapping.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+            let text = TextNormalizer.collapsingWhitespace(line.text)
             let b = line.box
             guard !text.isEmpty, [b.minX, b.minY, b.width, b.height].allSatisfy(\.isFinite), b.width > 0, b.height > 0 else { return nil }
             let clipped = b.intersection(CGRect(x: 0, y: 0, width: 1, height: 1))
