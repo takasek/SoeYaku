@@ -92,19 +92,21 @@ public actor FrameTranslator {
         return result
     }
 
+    private static let maxPartLength = 400
+
     private static func parts(_ text: String) -> [String] {
         var result: [String] = [], current = ""
         for sentence in ReadingOrder.sentences(text) {
-            if sentence.count <= 400 {
-                if !current.isEmpty, current.count + sentence.count + 1 > 400 { result.append(current); current = "" }
+            if sentence.count <= Self.maxPartLength {
+                if !current.isEmpty, current.count + sentence.count + 1 > Self.maxPartLength { result.append(current); current = "" }
                 current += (current.isEmpty ? "" : " ") + sentence
             } else {
                 if !current.isEmpty { result.append(current); current = "" }
                 for word in sentence.split(whereSeparator: \.isWhitespace).map(String.init) {
-                    if !current.isEmpty, current.count + word.count + 1 > 400 { result.append(current); current = "" }
+                    if !current.isEmpty, current.count + word.count + 1 > Self.maxPartLength { result.append(current); current = "" }
                     var remaining = word[...]
-                    while remaining.count > 400 {
-                        result.append(String(remaining.prefix(400))); remaining = remaining.dropFirst(400)
+                    while remaining.count > Self.maxPartLength {
+                        result.append(String(remaining.prefix(Self.maxPartLength))); remaining = remaining.dropFirst(Self.maxPartLength)
                     }
                     current += (current.isEmpty ? "" : " ") + remaining
                 }
