@@ -37,6 +37,7 @@ import UniformTypeIdentifiers
 
     let panel = TranslationPanel()
     private let server = ModelServer()
+    private let identities = ModelIdentityCache()
     private var run: Task<Void, Never>?
     private var follower: WindowFollower?
     private(set) var loadingTask: Task<Void, Never>?
@@ -206,16 +207,14 @@ import UniformTypeIdentifiers
     }
 
     private func pretranslation(for document: SourceDocument, requireModel: Bool = false) async throws -> Pretranslation {
-        let selectedModel = model
-        let identity = try await Task.detached {
-            guard let selectedModel else { return "" }
-            do { return try ModelIdentity.forFile(selectedModel) }
+        var identity = ""
+        if let selectedModel = model {
+            do { identity = try await identities.identity(for: selectedModel) }
             catch {
                 if requireModel { throw error }
                 // Reading and locating remain available when an old model path is no longer accessible.
-                return ""
             }
-        }.value
+        }
         return Pretranslation(document: document, glossary: try glossary(for: document), model: identity,
                        memoryURL: StoragePaths.memory(for: document.fingerprint))
     }
