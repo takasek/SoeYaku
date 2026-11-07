@@ -38,4 +38,10 @@ struct ReadingTextTests {
         let text = ReadingText(document: document, translations: [])
         #expect(text.string == "First. Second.\nThird. Fourth.")
     }
+
+    @Test func initFromSentencesMatchesInitFromDocument() {
+        let fromSentences = ReadingText(sentences: document.sentences, translations: ["一。", nil, nil, "四。"])
+        #expect(fromSentences == ReadingText(document: document, translations: ["一。", nil, nil, "四。"]))
+        #expect(fromSentences.string == "一。Second.\nThird. 四。")
+    }
 }

@@ -15,11 +15,15 @@ public struct ReadingText: Equatable, Sendable {
     public let runs: [Run]
 
     public init(document: SourceDocument, translations: [String?]) {
+        self.init(sentences: document.sentences, translations: translations)
+    }
+
+    public init(sentences: [Sentence], translations: [String?]) {
         var string = ""
         var runs: [Run] = []
         var paragraph: Int?
         var offset = 0
-        for sentence in document.sentences {
+        for sentence in sentences {
             let translation = sentence.id < translations.count ? translations[sentence.id] : nil
             let text = translation ?? sentence.text
             if let paragraph, paragraph != sentence.paragraph {
