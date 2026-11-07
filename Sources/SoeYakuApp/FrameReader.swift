@@ -35,12 +35,21 @@ enum FrameStyle {
     private let server = ModelServer()
     private var task: Task<Void, Never>?
     private var revision = UUID()
-    private let capture: @MainActor (FrameRegion) async throws -> CGImage
+    private let makeCapture: @MainActor () -> @MainActor (FrameRegion) async throws -> CGImage
     private let recognize: @Sendable (CGImage) async throws -> [TextLine]
 
-    init(panel: TranslationPanel, capture: @escaping @MainActor (FrameRegion) async throws -> CGImage = FrameCapture.image,
+    /// Without `capture`, each `observe` session captures through its own `FrameCapture`.
+    init(panel: TranslationPanel, capture: (@MainActor (FrameRegion) async throws -> CGImage)? = nil,
          recognize: @escaping @Sendable (CGImage) async throws -> [TextLine] = TextRecognizer.lines) {
-        self.panel = panel; self.capture = capture; self.recognize = recognize
+        self.panel = panel; self.recognize = recognize
+        if let capture {
+            makeCapture = { capture }
+        } else {
+            makeCapture = {
+                let session = FrameCapture()
+                return { try await session.image(in: $0) }
+            }
+        }
     }
 
     func chooseRegion() {
@@ -103,6 +112,7 @@ enum FrameStyle {
     /// Serialized snapshots: a translated batch always remains paired with its captured image.
     func observe(region: FrameRegion, style: FrameStyle, engine: FrameTranslator) async throws {
         let id = revision
+        let capture = makeCapture()
         var lastPixels: CapturedPixels?
         var lastBlocks: [FrameBlock]?
         var lastTranslations: [String] = []
