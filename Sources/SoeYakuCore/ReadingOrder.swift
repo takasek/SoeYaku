@@ -135,7 +135,7 @@ enum ReadingOrder {
                     line, after: flow[index - 1], key: keys[index], previousKey: keys[index - 1], widest: widest, leftEdge: leftEdge)
             {
                 var paragraph = result[result.count - 1]
-                paragraph.text = join(paragraph.text, text)
+                paragraph.text = Hyphenation.join(paragraph.text, text)
                 paragraph.lineStarts.append((paragraph.text.count - text.count, line.page))
                 result[result.count - 1] = paragraph
             } else {
@@ -201,15 +201,6 @@ enum ReadingOrder {
 
     private static func endsInLeader(_ text: String) -> Bool {
         text.range(of: #"(?:[.…·․]\s*){4,}\s*(?:\d+|[ivxlcdm]+)\s*$"#, options: [.regularExpression, .caseInsensitive]) != nil
-    }
-
-    private static func join(_ paragraph: String, _ next: String) -> String {
-        if paragraph.hasSuffix("-"), let before = paragraph.dropLast().last, before.isASCII, before.isLetter,
-            let first = next.first, first.isLowercase
-        {
-            return paragraph.dropLast() + next
-        }
-        return paragraph + " " + next
     }
 
     static func sentences(_ paragraph: String) -> [String] {
