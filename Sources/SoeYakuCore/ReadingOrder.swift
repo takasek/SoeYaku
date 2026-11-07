@@ -139,7 +139,7 @@ enum ReadingOrder {
                 paragraph.lineStarts.append((paragraph.text.count - text.count, line.page))
                 result[result.count - 1] = paragraph
             } else {
-                result.append(Paragraph(page: line.page, text: text, lineStarts: [(0, line.page)]))
+                result.append(Paragraph(text: text, lineStarts: [(0, line.page)]))
                 firstLine = line
             }
         }
@@ -159,10 +159,12 @@ enum ReadingOrder {
 
     /// Text of one paragraph with the page of every line in it.
     struct Paragraph {
-        let page: Int
         var text: String
-        /// Character offset in `text` at which each line starts, with the page of that line.
+        /// Character offset in `text` at which each line starts, with the page of that line; never empty.
         var lineStarts: [(offset: Int, page: Int)]
+
+        /// The page on which the paragraph starts.
+        var page: Int { lineStarts[0].page }
 
         /// The page of the line that contains the character at `offset`.
         func page(atOffset offset: Int) -> Int {
