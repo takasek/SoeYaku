@@ -40,9 +40,12 @@ import UniformTypeIdentifiers
     private let identities = ModelIdentityCache()
     private var run: Task<Void, Never>?
     private var follower: WindowFollower?
+    /// The locator index of the last opened document, kept so reopening it or following it again does not rebuild it.
+    private var documentIndex: (fingerprint: String, index: DocumentIndex)?
     private(set) var loadingTask: Task<Void, Never>?
     private var loadID = UUID()
     private let loadDocument: @Sendable (URL) async throws -> SourceDocument
+    private let indexDocument: @Sendable (SourceDocument) -> DocumentIndex
 
     var translatedCount: Int { translations.lazy.compactMap { $0 }.count }
     var isHTML: Bool { documentURL.flatMap { try? SourceDocumentLoader.format(of: $0) } == .html }
@@ -55,8 +58,9 @@ import UniformTypeIdentifiers
 
     init(loadDocument: @escaping @Sendable (URL) async throws -> SourceDocument = { url in
         try await SourceDocumentLoader.load(url)
-    }) {
+    }, indexDocument: @escaping @Sendable (SourceDocument) -> DocumentIndex = { DocumentIndex($0) }) {
         self.loadDocument = loadDocument
+        self.indexDocument = indexDocument
         frames = FrameReader(panel: panel)
         let installed = BrowserChoice.installed()
         browsers = installed
@@ -122,10 +126,13 @@ import UniformTypeIdentifiers
             do {
                 let extracted = try await loadDocument(url)
                 try Task.checkCancellation()
+                async let index = index(for: extracted)
                 let job = try await pretranslation(for: extracted)
                 let saved = try job.cached()
+                let built = await index
                 guard loadID == id, !Task.isCancelled else { return }
                 document = extracted
+                documentIndex = (extracted.fingerprint, built)
                 documentURL = url
                 translations = saved
                 refreshPanel()
@@ -136,6 +143,16 @@ import UniformTypeIdentifiers
                 status = error.localizedDescription
             }
         }
+    }
+
+    private func index(for document: SourceDocument) async -> DocumentIndex {
+        if let documentIndex, documentIndex.fingerprint == document.fingerprint { return documentIndex.index }
+        return await Self.build(document, with: indexDocument)
+    }
+
+    @concurrent private nonisolated static func build(_ document: SourceDocument,
+                                                      with indexDocument: @Sendable (SourceDocument) -> DocumentIndex) async -> DocumentIndex {
+        indexDocument(document)
     }
 
     func openInViewer() {
@@ -273,14 +290,15 @@ import UniformTypeIdentifiers
     func toggleFollowing() { following ? stopFollowing() : startFollowing() }
 
     private func startFollowing() {
-        guard mode == .document, !loading, let document else { return }
+        guard mode == .document, !loading, let document,
+              let documentIndex, documentIndex.fingerprint == document.fingerprint else { return }
         let id = loadID
         let viewer = self.viewer
         if case .browser(let bundleID, _) = viewer, NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) == nil {
             status = "閲覧するブラウザを選んでください。"
             return
         }
-        let follower = WindowFollower(document: document, viewer: viewer, excludedWindows: [panel.window])
+        let follower = WindowFollower(index: documentIndex.index, viewer: viewer, excludedWindows: [panel.window])
         follower.onResult = { [weak self] result in
             guard let self, self.loadID == id else { return }
             self.show(result)
