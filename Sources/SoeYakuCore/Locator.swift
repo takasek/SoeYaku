@@ -197,10 +197,14 @@ public struct Locator: Sendable {
 
     /// A line ending in a letter and "-" continues with the first token of the next line.
     private func joinedQuery(_ column: [Candidate]) -> ([String], [[Int]]) {
+        Self.joinedQuery(column.map { (text: $0.line.text, tokens: $0.tokens) })
+    }
+
+    static func joinedQuery(_ lines: [(text: String, tokens: [String])]) -> ([String], [[Int]]) {
         var query: [String] = []
         var positions: [[Int]] = []
-        for (k, entry) in column.enumerated() {
-            let previous = k > 0 ? column[k - 1].line.text.trimmingCharacters(in: .whitespaces) : ""
+        for (k, entry) in lines.enumerated() {
+            let previous = k > 0 ? lines[k - 1].text.trimmingCharacters(in: .whitespaces) : ""
             let joins = previous.hasSuffix("-") && previous.dropLast().last?.isLetter == true && !query.isEmpty
             var linePositions: [Int] = []
             for (offset, token) in entry.tokens.enumerated() {
