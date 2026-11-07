@@ -70,7 +70,8 @@ public struct Glossary: Sendable, Equatable {
 
     /// One `source = target` line per term that occurs in any of `texts`, in glossary order.
     public func kikiyakuText(appliedTo texts: [String]) -> String {
-        terms.filter { term in texts.contains { term.occurs(in: $0) } }
+        let joined = texts.joined(separator: "\n")
+        return terms.filter { $0.occurs(in: joined) }
             .map { "\($0.source) = \($0.target)\n" }
             .joined()
     }

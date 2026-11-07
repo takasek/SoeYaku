@@ -64,4 +64,9 @@ struct GlossaryTests {
         #expect(glossary.kikiyakuText(appliedTo: ["nothing"]) == "")
         #expect(glossary.matches(in: "agent").map(\.target) == ["代理人"])
     }
+
+    @Test func kikiyakuTextDoesNotMatchATermSplitAcrossTwoTexts() throws {
+        let glossary = try Glossary.parse("speech recognition = 音声認識", name: "g.txt")
+        #expect(glossary.kikiyakuText(appliedTo: ["speech", "recognition"]) == "")
+    }
 }
