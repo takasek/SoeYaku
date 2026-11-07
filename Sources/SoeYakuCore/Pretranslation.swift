@@ -48,6 +48,14 @@ public struct Pretranslation: Sendable {
     /// Progress is saved every 10 sentences, at the end, and on cancellation, which throws `CancellationError`.
     public func run(using translator: some SentenceTranslator,
                     progress: @Sendable (TranslationProgress) async -> Void) async throws -> [String?] {
+        try await run(using: translator, progress: progress, translated: { _, _ in })
+    }
+
+    /// Like `run(using:progress:)`, and also reports each sentence's translation, saved or new, with its index in the result.
+    /// A sentence's `translated` call comes before its `progress` call; a failed sentence has no `translated` call.
+    public func run(using translator: some SentenceTranslator,
+                    progress: @Sendable (TranslationProgress) async -> Void,
+                    translated: @Sendable (_ index: Int, _ translation: String) async -> Void) async throws -> [String?] {
         var memory = try TranslationMemory.load(from: memoryURL)
         var results = [String?](repeating: nil, count: entries.count)
         var history: [TranslationPair] = []
@@ -86,6 +94,7 @@ public struct Pretranslation: Sendable {
                     history.append(TranslationPair(source: sentence.text, translation: translation))
                     done += 1
                     consecutiveFailures = 0
+                    await translated(index, translation)
                 }
                 await progress(TranslationProgress(done: done, failed: failed, total: entries.count))
                 if (index + 1) % Self.saveInterval == 0 { try memory.save(to: memoryURL) }
