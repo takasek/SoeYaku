@@ -22,7 +22,6 @@ public struct DocumentIndex: Sendable {
     /// 3-grams that occur more often than this carry no position information and are left out.
     static let maxOccurrences = 64
 
-    let tokenCount: Int
     let tokens: [String]
     let sentenceOfToken: [Int]
     let occurrences: [String: [Int]]
@@ -42,7 +41,6 @@ public struct DocumentIndex: Sendable {
                 occurrences[Self.gram(tokens, position), default: []].append(position)
             }
         }
-        self.tokenCount = tokens.count
         self.tokens = tokens
         self.sentenceOfToken = sentenceOfToken
         self.occurrences = occurrences.filter { $0.value.count <= Self.maxOccurrences }
@@ -134,7 +132,7 @@ public struct Locator: Sendable {
             guard let last = lastSentence else { return .rejected }
             let sentenceFor = { (shift: Int) -> Int? in
                 let position = shift + target
-                return (0..<index.tokenCount).contains(position) ? index.sentenceOfToken[position] : nil
+                return index.tokens.indices.contains(position) ? index.sentenceOfToken[position] : nil
             }
             let options = ([best.key] + rivals.sorted()).compactMap { shift in
                 sentenceFor(shift).map { (shift: shift, distance: abs($0 - last)) }
@@ -146,10 +144,10 @@ public struct Locator: Sendable {
         let aligned = (-3...3).compactMap { adjustment -> (shift: Int, matches: Int)? in
             let shift = chosen + adjustment
             let position = shift + target
-            guard (0..<index.tokenCount).contains(position), query[target] == index.tokens[position] else { return nil }
+            guard index.tokens.indices.contains(position), query[target] == index.tokens[position] else { return nil }
             let matches = anchorPositions.filter { q in
                 let p = shift + q
-                return (0..<index.tokenCount).contains(p) && query[q] == index.tokens[p]
+                return index.tokens.indices.contains(p) && query[q] == index.tokens[p]
             }.count
             return matches * 2 >= anchorPositions.count ? (shift, matches) : nil
         }.max {
