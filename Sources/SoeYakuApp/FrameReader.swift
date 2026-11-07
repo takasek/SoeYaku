@@ -52,7 +52,7 @@ enum ReadingMode: String, CaseIterable, Identifiable {
         task = Task {
             do {
                 let helper = try BundledHelper.modelStarter(missingMessage: "配布用の SoeYaku.app から起動してください。")
-                let glossary = try Glossary.load(FileManager.default.fileExists(atPath: StoragePaths.commonGlossary.path) ? [StoragePaths.commonGlossary] : [])
+                let glossary = try Glossary.loadExisting([StoragePaths.commonGlossary])
                 let port = try await server.start(executable: helper, model: model)
                 try Task.checkCancellation()
                 let engine = FrameTranslator(using: try LocalTranslator(port: port, apiKey: server.apiKey), glossary: glossary)

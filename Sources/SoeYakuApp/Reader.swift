@@ -221,7 +221,7 @@ import UniformTypeIdentifiers
 
     private func glossary(for document: SourceDocument) throws -> Glossary {
         let files = [StoragePaths.commonGlossary, StoragePaths.documentGlossary(for: document.fingerprint)]
-        return try Glossary.load(files.filter { FileManager.default.fileExists(atPath: $0.path) })
+        return try Glossary.loadExisting(files)
     }
 
     func openCommonGlossary() { edit(StoragePaths.commonGlossary, scope: "共通") }
