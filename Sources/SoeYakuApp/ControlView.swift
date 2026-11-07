@@ -141,7 +141,7 @@ struct ControlView: View {
                     .buttonStyle(.borderedProminent).tint(reader.following ? .gray : accent).disabled(reader.document == nil)
                 } else {
                     Button(frames.running ? "翻訳を止める" : "枠の翻訳を開始") {
-                        if frames.running { frames.stop() } else { frames.start(model: reader.model, style: reader.mode) }
+                        if frames.running { frames.stop() } else if let style = reader.mode.frameStyle { frames.start(model: reader.model, style: style) }
                     }.buttonStyle(.borderedProminent).tint(frames.running ? .gray : accent)
                         .disabled(frames.region == nil || frames.selecting)
                 }

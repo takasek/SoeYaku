@@ -53,8 +53,8 @@ enum FrameStyle {
         }
     }
 
-    func start(model: URL?, style: ReadingMode) {
-        guard style != .document, !running, !selecting, let region else { return }
+    func start(model: URL?, style: FrameStyle) {
+        guard !running, !selecting, let region else { return }
         guard let model, FileManager.default.fileExists(atPath: model.path) else {
             status = "翻訳モデル（GGUF）を選んでください。"; return
         }
@@ -98,7 +98,7 @@ enum FrameStyle {
     }
 
     /// Serialized snapshots: a translated batch always remains paired with its captured image.
-    func observe(region: FrameRegion, style: ReadingMode, engine: FrameTranslator) async throws {
+    func observe(region: FrameRegion, style: FrameStyle, engine: FrameTranslator) async throws {
         let id = revision
         var lastImage: CFData?
         var lastBlocks: [FrameBlock]?
@@ -139,9 +139,11 @@ enum FrameStyle {
         }
     }
 
-    private func present(_ image: CGImage, blocks: [FrameBlock], translations: [String], style: ReadingMode, resetScroll: Bool = false) {
-        if style == .frameImage { panel.displayFrame(image, blocks: blocks, translations: translations) }
-        else {
+    private func present(_ image: CGImage, blocks: [FrameBlock], translations: [String], style: FrameStyle, resetScroll: Bool = false) {
+        switch style {
+        case .image:
+            panel.displayFrame(image, blocks: blocks, translations: translations)
+        case .text:
             let sentences = blocks.enumerated().map {
                 Sentence(id: $0.offset, paragraph: $0.offset, page: 0, text: $0.element.text)
             }

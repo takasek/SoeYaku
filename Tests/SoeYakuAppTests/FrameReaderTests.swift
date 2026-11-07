@@ -13,7 +13,7 @@ import Testing
             [TextLine(text: image.width == 80 ? "Old dialogue." : "Next dialogue.", box: CGRect(x: 0.1, y: 0.1, width: 0.8, height: 0.1))]
         })
         let engine = FrameTranslator(using: FailingFrameTranslator(), glossary: Glossary())
-        let work = Task { try await reader.observe(region: region, style: .frameText, engine: engine) }
+        let work = Task { try await reader.observe(region: region, style: .text, engine: engine) }
         let deadline = ContinuousClock.now + .seconds(2)
         while ContinuousClock.now < deadline, !displayedText(panel).contains("次の台詞") {
             try await Task.sleep(for: .milliseconds(20))
@@ -30,7 +30,7 @@ import Testing
         let image = try bitmap()
         let reader = FrameReader(panel: panel, capture: { _ in await gate.wait(); return image }, recognize: { _ in [] })
         let engine = FrameTranslator(using: GatedFrameTranslator(gate: nil), glossary: Glossary())
-        let work = Task { try await reader.observe(region: region, style: .frameText, engine: engine) }
+        let work = Task { try await reader.observe(region: region, style: .text, engine: engine) }
         await entered(gate)
         reader.stop(); panel.setFooter("keep after stop")
         await gate.release()
@@ -47,7 +47,7 @@ import Testing
             [TextLine(text: "Cross the bridge.", box: CGRect(x: 0.1, y: 0.1, width: 0.8, height: 0.1))]
         })
         let engine = FrameTranslator(using: GatedFrameTranslator(gate: gate), glossary: Glossary())
-        let work = Task { try await reader.observe(region: region, style: .frameText, engine: engine) }
+        let work = Task { try await reader.observe(region: region, style: .text, engine: engine) }
         await entered(gate)
         reader.stop(); panel.setFooter("keep after stop")
         await gate.release()
