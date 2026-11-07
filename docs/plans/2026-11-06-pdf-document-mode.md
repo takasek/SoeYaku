@@ -8,7 +8,7 @@
 
 **Tech Stack:** Swift 6.2+、macOS 26+、PDFKit、NaturalLanguage、Vision、ScreenCaptureKit、SwiftUI/AppKit、llama.cpp build 11960、PLaMo 3 Translate 2B GGUF。
 
-**Spec:** `/Users/m5/Documents/Codex/2026-11-06/works/SoeYaku-plan.md` の「最初に作るもの」1〜3 と「用語集と Kikiyaku への連絡」の形式部分。手順4（HTML・枠モード1・枠モード2）はこの計画の対象外。
+**Spec:** PDF本文を読み順に抽出し、文書全体を事前翻訳して別窓へ表示する。Previewでポインターを置いた文へ訳文の強調とスクロールを追従させ、保存した訳を再利用する。用語集は `原語 = 訳語` とTSVを受け付け、該当語をKikiyaku向けにコピーできるようにする。HTML・枠モード1・枠モード2は、この初期計画の後続工程。
 
 ## Global Constraints
 
@@ -40,7 +40,7 @@
 **Files:**
 - Create: `Sources/SoeYakuCore/Glossary.swift`, `Sources/SoeYakuCore/PFML3.swift`, `Sources/SoeYakuCore/LocalTranslator.swift`, `Sources/SoeYakuCore/TranslationMemory.swift`, `Sources/SoeYakuCore/Pretranslation.swift`
 - Test: `Tests/SoeYakuCoreTests/GlossaryTests.swift`, `Tests/SoeYakuCoreTests/TranslatorTests.swift`, `Tests/SoeYakuCoreTests/PretranslationTests.swift`
-- 移植元: `/Users/m5/works/local-caption/Sources/CaptionCore/Translation.swift` と `/Users/m5/works/local-caption/Tests/CaptionCoreTests/TranslationTests.swift`
+- 開発時の移植元は前身のローカル字幕試作。公開リポジトリでは以下のインターフェースと同梱テストを基準とする。
 
 **Interfaces:**
 - Consumes: `Sentence`, `SourceDocument`（`Sources/SoeYakuCore/Document.swift`）
@@ -137,7 +137,7 @@
 - Test: `Tests/SoeYakuVisionTests/EndToEndTests.swift`
 
 **Interfaces:**
-- Produces: `public enum TextRecognizer { public static func lines(in image: CGImage) async throws -> [TextLine] }`（英語・正確モード・言語補正あり。箱は `ScreenGeometry.topLeft` で左上原点に直す）
+- Produces: `public enum TextRecognizer { public static func lines(in image: CGImage) async throws -> [TextLine]; public static func warmUp() async }`（Swift の Vision API `RecognizeTextRequest`、英語 `en-US`・`.accurate`・言語補正あり。箱は `ScreenGeometry.topLeft` で左上原点に直す。`warmUp` は文字を1行描いた小さな画像を1回認識して結果とエラーを捨てる。初回の認識はモデル読み込みで数十秒かかり、2回目以降は1画面0.1秒程度であることを確認済み）
 - CLI: `soeyaku-cli extract FILE.pdf`（文を JSON Lines）／`soeyaku-cli translate FILE.pdf --port N [--api-key K] [--glossary FILE]... [--memory FILE] [--model NAME]`（事前翻訳して `{"id","en","ja"}` を JSON Lines）／`soeyaku-cli locate FILE.pdf IMAGE.png --pointer X,Y`（画像ピクセル座標。`{"status","sentence","text","confidence"}` を1行）
 
 決めてあること:
