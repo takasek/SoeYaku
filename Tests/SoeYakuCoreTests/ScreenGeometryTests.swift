@@ -29,4 +29,20 @@ struct ScreenGeometryTests {
         #expect(ScreenGeometry.normalizedPointer(
             mouse: CGPoint(x: 150, y: 900), primaryScreenHeight: 1000, windowFrame: frame) == nil)
     }
+
+    @Test func columnsShareWhenOverlapIsAtLeastHalfTheNarrowerWidth() {
+        let a = CGRect(x: 0, y: 0, width: 0.5, height: 0.1)
+        #expect(ScreenGeometry.sharesColumn(a, CGRect(x: 0.25, y: 0.2, width: 0.5, height: 0.1)))
+        #expect(!ScreenGeometry.sharesColumn(a, CGRect(x: 0.2501, y: 0.2, width: 0.5, height: 0.1)))
+        #expect(!ScreenGeometry.sharesColumn(a, CGRect(x: 0.6, y: 0.2, width: 0.3, height: 0.1)))
+        #expect(ScreenGeometry.sharesColumn(a, CGRect(x: 0.1, y: 0.2, width: 0.1, height: 0.1)))
+    }
+
+    @Test func sharesColumnIsSymmetric() {
+        let a = CGRect(x: 0, y: 0, width: 0.5, height: 0.1)
+        for b in [CGRect(x: 0.25, y: 0, width: 0.5, height: 0.1), CGRect(x: 0.2501, y: 0, width: 0.5, height: 0.1),
+                  CGRect(x: 0.1, y: 0, width: 0.1, height: 0.1), CGRect(x: 0.6, y: 0, width: 0.3, height: 0.1)] {
+            #expect(ScreenGeometry.sharesColumn(a, b) == ScreenGeometry.sharesColumn(b, a))
+        }
+    }
 }

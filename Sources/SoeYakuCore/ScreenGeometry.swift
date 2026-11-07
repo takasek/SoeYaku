@@ -7,6 +7,11 @@ public enum ScreenGeometry {
         CGRect(x: box.minX, y: 1 - box.maxY, width: box.width, height: box.height)
     }
 
+    /// Two boxes are in one column when their horizontal overlap is at least half the narrower width.
+    public static func sharesColumn(_ a: CGRect, _ b: CGRect) -> Bool {
+        min(a.maxX, b.maxX) - max(a.minX, b.minX) >= min(a.width, b.width) * 0.5
+    }
+
     /// `mouse` is in Cocoa global coordinates (origin at the bottom-left of the primary screen).
     /// `windowFrame` is in CG global coordinates (origin at the top-left of the primary screen).
     /// Returns the pointer as a 0...1 fraction of the window from its top-left, or nil outside the window.
