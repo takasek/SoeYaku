@@ -27,7 +27,7 @@ public enum FrameText {
                box.minY > p.minY + p.height * 0.3,
                box.minY - p.maxY < max(p.height, box.height) * 0.9,
                abs(box.height - p.height) < p.height * 0.35,
-               min(box.maxX, p.maxX) - max(box.minX, p.minX) >= min(box.width, p.width) * 0.5 {
+               ScreenGeometry.sharesColumn(box, p) {
                 let text = Hyphenation.join(last.text, line.text)
                 result[result.count - 1] = FrameBlock(text: text, box: last.box.union(box))
             } else {
