@@ -167,10 +167,8 @@ import UniformTypeIdentifiers
                 let prepared = try await pretranslation(for: document, requireModel: true)
                 job = prepared
                 try Task.checkCancellation()
-                guard let helper = Bundle.main.executableURL?.deletingLastPathComponent().deletingLastPathComponent()
-                    .appending(path: "Helpers/start-model"), FileManager.default.isExecutableFile(atPath: helper.path) else {
-                    throw AppFailure("アプリ内の翻訳ヘルパーが見つかりません。Scripts/build-app.sh で作った SoeYaku.app から起動してください。")
-                }
+                let helper = try BundledHelper.modelStarter(
+                    missingMessage: "アプリ内の翻訳ヘルパーが見つかりません。Scripts/build-app.sh で作った SoeYaku.app から起動してください。")
                 let port = try await server.start(executable: helper, model: model)
                 let translator = try LocalTranslator(port: port, apiKey: server.apiKey)
                 status = "全文を翻訳しています。訳した文から順に保存します。"

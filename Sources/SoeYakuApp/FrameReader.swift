@@ -53,10 +53,7 @@ enum ReadingMode: String, CaseIterable, Identifiable {
         panel.clear(); panel.setFooter(status); panel.show()
         task = Task {
             do {
-                guard let helper = Bundle.main.executableURL?.deletingLastPathComponent().deletingLastPathComponent()
-                    .appending(path: "Helpers/start-model"), FileManager.default.isExecutableFile(atPath: helper.path) else {
-                    throw AppFailure("配布用の SoeYaku.app から起動してください。")
-                }
+                let helper = try BundledHelper.modelStarter(missingMessage: "配布用の SoeYaku.app から起動してください。")
                 let glossary = try Glossary.load(FileManager.default.fileExists(atPath: StoragePaths.commonGlossary.path) ? [StoragePaths.commonGlossary] : [])
                 let port = try await server.start(executable: helper, model: model)
                 try Task.checkCancellation()
