@@ -44,10 +44,8 @@ enum ReadingMode: String, CaseIterable, Identifiable {
         guard let model, FileManager.default.fileExists(atPath: model.path) else {
             status = "翻訳モデル（GGUF）を選んでください。"; return
         }
-        guard CGPreflightScreenCaptureAccess() else {
-            CGRequestScreenCaptureAccess()
-            status = WindowFollower.Problem.permission.localizedDescription; return
-        }
+        do { try ScreenRecording.requestAccess() }
+        catch { status = error.localizedDescription; return }
         let id = UUID(); revision = id
         running = true; status = "翻訳モデルを読み込んでいます…"
         panel.clear(); panel.setFooter(status); panel.show()

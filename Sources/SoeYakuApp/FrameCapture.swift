@@ -3,7 +3,7 @@ import ScreenCaptureKit
 
 @MainActor enum FrameCapture {
     static func image(in region: FrameRegion) async throws -> CGImage {
-        guard CGPreflightScreenCaptureAccess() else { throw WindowFollower.Problem.permission }
+        guard CGPreflightScreenCaptureAccess() else { throw ScreenRecording.Problem.permission }
         let content = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true)
         guard let display = content.displays.first(where: { $0.displayID == region.displayID }) else {
             throw AppFailure("選んだ画面が見つかりません。枠を選び直してください。")

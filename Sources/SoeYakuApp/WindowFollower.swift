@@ -7,13 +7,6 @@ import UniformTypeIdentifiers
 /// Reads the front window of the viewer app and reports which sentence is under the pointer.
 /// It captures only that window, and only while the viewer is the active app and the pointer is inside the window.
 @MainActor final class WindowFollower {
-    enum Problem: LocalizedError {
-        case permission
-        var errorDescription: String? {
-            "画面収録が許可されていません。システム設定の「プライバシーとセキュリティ」→「画面とシステムオーディオの録音」で SoeYaku を許可し、SoeYaku を開き直してください。"
-        }
-    }
-
     static let previewBundleID = "com.apple.Preview"
     private let bundleID: String
     private let documentName: String?
@@ -37,10 +30,7 @@ import UniformTypeIdentifiers
 
     /// Asks for the screen recording permission when it is missing and does not start without it.
     func start() throws {
-        guard CGPreflightScreenCaptureAccess() else {
-            CGRequestScreenCaptureAccess()
-            throw Problem.permission
-        }
+        try ScreenRecording.requestAccess()
         task?.cancel()
         task = Task { [weak self] in
             while !Task.isCancelled {
