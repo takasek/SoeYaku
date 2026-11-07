@@ -129,10 +129,10 @@ enum ReadingMode: String, CaseIterable, Identifiable {
     private func present(_ image: CGImage, blocks: [FrameBlock], translations: [String], style: ReadingMode, resetScroll: Bool = false) {
         if style == .frameImage { panel.displayFrame(image, blocks: blocks, translations: translations) }
         else {
-            let document = SourceDocument(fingerprint: "frame", title: "枠1", sentences: blocks.enumerated().map {
+            let sentences = blocks.enumerated().map {
                 Sentence(id: $0.offset, paragraph: $0.offset, page: 0, text: $0.element.text)
-            })
-            panel.display(ReadingText(document: document, translations: translations.map(Optional.some)), resetScroll: resetScroll)
+            }
+            panel.display(ReadingText(sentences: sentences, translations: translations.map(Optional.some)), resetScroll: resetScroll)
         }
     }
 }
