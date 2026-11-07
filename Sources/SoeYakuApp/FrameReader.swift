@@ -15,6 +15,9 @@ enum ReadingMode: String, CaseIterable, Identifiable {
         case .frameImage: .image
         }
     }
+
+    /// Whether the translation is shown as text sized by the font size setting; the image frame fits its text to each block.
+    var usesFontSize: Bool { frameStyle != .image }
 }
 
 /// How the translation of a screen region is shown: as continuous text, or over a copy of the region's image.

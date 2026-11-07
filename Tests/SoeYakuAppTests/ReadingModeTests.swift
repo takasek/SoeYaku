@@ -7,4 +7,8 @@ struct ReadingModeTests {
         #expect(ReadingMode.frameText.frameStyle == .text)
         #expect(ReadingMode.frameImage.frameStyle == .image)
     }
+
+    @Test func theFontSizeAppliesToEveryModeExceptTheImageFrame() {
+        #expect(ReadingMode.allCases.filter(\.usesFontSize) == [.document, .frameText])
+    }
 }
