@@ -177,9 +177,11 @@ import UniformTypeIdentifiers
                 let port = try await server.start(executable: helper, model: model)
                 let translator = try LocalTranslator(port: port, apiKey: server.apiKey)
                 status = "全文を翻訳しています。訳した文から順に保存します。"
-                let result = try await prepared.run(using: translator) { [weak self] step in
-                    await self?.advance(step, job: prepared)
-                }
+                let result = try await prepared.run(using: translator, progress: { [weak self] step in
+                    await self?.advance(step)
+                }, translated: { [weak self] index, translation in
+                    await self?.record(translation, at: index)
+                })
                 translations = result
                 let failed = result.filter { $0 == nil }.count
                 status = failed == 0 ? "全 \(result.count) 文の翻訳が終わりました。"
@@ -200,13 +202,16 @@ import UniformTypeIdentifiers
 
     func cancelTranslation() { run?.cancel() }
 
-    private func advance(_ step: TranslationProgress, job: Pretranslation) {
+    private func advance(_ step: TranslationProgress) {
         progress = step
-        // The run saves every 10 sentences; show what has been saved so far.
-        if step.done % 10 == 0, let saved = try? job.cached() {
-            translations = saved
-            refreshPanel()
-        }
+        // Rebuilding the panel is costly, so it shows the translations recorded so far every 10 sentences.
+        if step.done % 10 == 0 { refreshPanel() }
+    }
+
+    /// Takes one sentence's translation from the running translation; the panel shows it at its next rebuild.
+    func record(_ translation: String, at index: Int) {
+        guard translations.indices.contains(index) else { return }
+        translations[index] = translation
     }
 
     private func pretranslation(for document: SourceDocument, requireModel: Bool = false) async throws -> Pretranslation {

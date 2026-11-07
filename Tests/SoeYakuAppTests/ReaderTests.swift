@@ -69,6 +69,22 @@ import Testing
         reader.shutdown()
     }
 
+    @Test func aReportedTranslationReplacesOnlyItsSentence() async throws {
+        let loader = DocumentLoader()
+        let reader = reader(loader)
+        let pdf = URL(filePath: "/tmp/document.pdf")
+        reader.open(pdf)
+        let task = try #require(reader.loadingTask)
+        await loader.waitUntilStarted(pdf)
+        await loader.finish(pdf)
+        await task.value
+        #expect(reader.translations == [nil])
+        reader.record("訳", at: 0)
+        reader.record("範囲外", at: 1)
+        #expect(reader.translations == ["訳"])
+        reader.shutdown()
+    }
+
     @Test func opensStaticHTMLThroughTheSharedDocumentLoaderAndChoosesBrowserFollowing() async throws {
         _ = NSApplication.shared
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("soeyaku-html-\(UUID().uuidString).html")
