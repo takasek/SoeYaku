@@ -10,7 +10,7 @@ public enum ModelIdentity {
         while let chunk = try file.read(upToCount: 1_048_576), !chunk.isEmpty {
             hash.update(data: chunk)
         }
-        return "sha256:" + hash.finalize().map { String(format: "%02x", $0) }.joined()
+        return "sha256:" + hash.finalize().lowercaseHex
     }
 }
 

@@ -12,7 +12,7 @@ public struct TranslationMemory: Codable, Sendable, Equatable {
         let normalized = source.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         let parts = [normalized] + terms.map { "\($0.source)\u{1F}\($0.target)" } + [model]
         let digest = SHA256.hash(data: Data(parts.joined(separator: "\u{1E}").utf8))
-        return digest.map { String(format: "%02x", $0) }.joined()
+        return digest.lowercaseHex
     }
 
     public subscript(key: String) -> String? {

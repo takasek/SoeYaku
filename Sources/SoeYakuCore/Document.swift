@@ -32,6 +32,6 @@ public struct SourceDocument: Codable, Sendable, Equatable {
     }
 
     public static func fingerprint(of data: Data) -> String {
-        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        SHA256.hash(data: data).lowercaseHex
     }
 }
