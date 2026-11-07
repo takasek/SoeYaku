@@ -48,10 +48,11 @@ import UniformTypeIdentifiers
     }
 
     private func tick() async {
-        guard let app = NSWorkspace.shared.frontmostApplication, app.bundleIdentifier == bundleID,
-              let (windowID, frame) = frontWindow(of: app.processIdentifier) else { return }
+        guard let app = NSWorkspace.shared.frontmostApplication, app.bundleIdentifier == bundleID else { return }
+        let list = Self.onScreenWindows()
+        guard let (windowID, frame) = frontWindow(of: app.processIdentifier, in: list) else { return }
         let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
-        guard normalizedPointer(mouse: NSEvent.mouseLocation, primaryScreenHeight: primaryHeight, viewerFrame: frame, viewerWindowID: windowID) != nil else { return }
+        guard normalizedPointer(mouse: NSEvent.mouseLocation, primaryScreenHeight: primaryHeight, viewerFrame: frame, viewerWindowID: windowID, windows: list) != nil else { return }
         do {
             let image = try await capture(windowID: windowID, size: frame.size)
             guard !Task.isCancelled else { return }
@@ -63,10 +64,12 @@ import UniformTypeIdentifiers
                 lastImage = data
             }
             guard !Task.isCancelled else { return }
+            // The window list is fetched again after the await: this re-check detects a window that changed during the OCR.
+            let currentList = Self.onScreenWindows()
             guard NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier,
-                  let (currentWindowID, currentFrame) = frontWindow(of: app.processIdentifier),
+                  let (currentWindowID, currentFrame) = frontWindow(of: app.processIdentifier, in: currentList),
                   currentWindowID == windowID, currentFrame == frame,
-                  let pointer = normalizedPointer(mouse: NSEvent.mouseLocation, primaryScreenHeight: primaryHeight, viewerFrame: frame, viewerWindowID: windowID)
+                  let pointer = normalizedPointer(mouse: NSEvent.mouseLocation, primaryScreenHeight: primaryHeight, viewerFrame: frame, viewerWindowID: windowID, windows: currentList)
             else { return }
             onResult?(locator.locate(lines: lastLines, pointer: pointer))
         } catch {
@@ -77,7 +80,7 @@ import UniformTypeIdentifiers
     func normalizedPointer(mouse: CGPoint, primaryScreenHeight: CGFloat, viewerFrame: CGRect, viewerWindowID: CGWindowID, windows: [[String: Any]]? = nil) -> CGPoint? {
         guard let pointer = ScreenGeometry.normalizedPointer(mouse: mouse, primaryScreenHeight: primaryScreenHeight, windowFrame: viewerFrame) else { return nil }
         let ignored = Set(excludedWindows.filter { !$0.isVisible || !$0.isOnActiveSpace || $0.isMiniaturized }.map { CGWindowID($0.windowNumber) })
-        let list = windows ?? (CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? [])
+        let list = windows ?? Self.onScreenWindows() ?? []
         let point = CGPoint(x: mouse.x, y: primaryScreenHeight - mouse.y)
         for info in list {
             guard let number = info[kCGWindowNumber as String] as? CGWindowID, !ignored.contains(number),
@@ -114,11 +117,14 @@ import UniformTypeIdentifiers
     }
 
     /// The topmost normal window of the process, with its frame in global top-left coordinates.
-    private func frontWindow(of pid: pid_t) -> (CGWindowID, CGRect)? {
-        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
-                as? [[String: Any]] else { return nil }
+    private func frontWindow(of pid: pid_t, in list: [[String: Any]]?) -> (CGWindowID, CGRect)? {
+        guard let list else { return nil }
         if let browserTitles { return Self.frontBrowserWindow(in: list, pid: pid, titles: browserTitles) }
         return Self.frontDocumentWindow(in: list, pid: pid, documentName: documentName)
+    }
+
+    private static func onScreenWindows() -> [[String: Any]]? {
+        CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]
     }
 
     private static func isNormalWindow(_ info: [String: Any], pid: pid_t) -> Bool {
