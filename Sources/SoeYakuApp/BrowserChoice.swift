@@ -12,7 +12,7 @@ struct BrowserChoice: Identifiable {
             BrowserChoice(id: "com.microsoft.edgemac", name: "Edge"),
             BrowserChoice(id: "com.brave.Browser", name: "Brave")
         ].filter { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0.id) != nil }
-        if let url = NSWorkspace.shared.urlForApplication(toOpen: URL(string: "https://example.com")!),
+        if let url = defaultBrowserURL,
            let id = Bundle(url: url)?.bundleIdentifier, !choices.contains(where: { $0.id == id }) {
             choices.append(BrowserChoice(id: id, name: url.deletingPathExtension().lastPathComponent))
         }
@@ -20,6 +20,10 @@ struct BrowserChoice: Identifiable {
     }
 
     @MainActor static func defaultID() -> String? {
-        NSWorkspace.shared.urlForApplication(toOpen: URL(string: "https://example.com")!).flatMap { Bundle(url: $0)?.bundleIdentifier }
+        defaultBrowserURL.flatMap { Bundle(url: $0)?.bundleIdentifier }
+    }
+
+    @MainActor private static var defaultBrowserURL: URL? {
+        NSWorkspace.shared.urlForApplication(toOpen: URL(string: "https://example.com")!)
     }
 }
