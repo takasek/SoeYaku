@@ -11,7 +11,7 @@ import UniformTypeIdentifiers
     private var locator: Locator
     private var task: Task<Void, Never>?
     private var window: SCWindow?
-    private var lastImage: CFData?
+    private var lastPixels: CapturedPixels?
     private var lastLines: [TextLine] = []
     private let excludedWindows: [NSWindow]
     var onResult: ((LocateResult) -> Void)?
@@ -38,7 +38,7 @@ import UniformTypeIdentifiers
     func stop() {
         task?.cancel()
         task = nil
-        lastImage = nil
+        lastPixels = nil
         lastLines = []
     }
 
@@ -51,12 +51,11 @@ import UniformTypeIdentifiers
         do {
             let image = try await capture(windowID: windowID, size: frame.size)
             guard !Task.isCancelled else { return }
-            let data = image.dataProvider?.data
-            if let data, let lastImage, CFEqual(data, lastImage) {
-                // Same pixels as last time: only the pointer can have moved, so skip the OCR.
-            } else {
+            // Same pixels as last time: only the pointer can have moved, so the OCR is skipped.
+            let pixels = CapturedPixels(image)
+            if !pixels.matches(lastPixels) {
                 lastLines = try await TextRecognizer.lines(in: image)
-                lastImage = data
+                lastPixels = pixels
             }
             guard !Task.isCancelled else { return }
             // The window list is fetched again after the await: this re-check detects a window that changed during the OCR.
