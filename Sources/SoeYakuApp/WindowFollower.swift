@@ -17,10 +17,15 @@ import UniformTypeIdentifiers
     var onResult: ((LocateResult) -> Void)?
     var onProblem: ((String) -> Void)?
 
-    init(document: SourceDocument, viewer: Viewer = .preview(documentName: nil), excludedWindows: [NSWindow] = []) {
+    /// The caller builds `index` once per document off the main actor; building it here would block the main actor on every follow start.
+    init(index: DocumentIndex, viewer: Viewer = .preview(documentName: nil), excludedWindows: [NSWindow] = []) {
         self.viewer = viewer
         self.excludedWindows = excludedWindows
-        locator = Locator(index: DocumentIndex(document))
+        locator = Locator(index: index)
+    }
+
+    convenience init(document: SourceDocument, viewer: Viewer = .preview(documentName: nil), excludedWindows: [NSWindow] = []) {
+        self.init(index: DocumentIndex(document), viewer: viewer, excludedWindows: excludedWindows)
     }
 
     /// Asks for the screen recording permission when it is missing and does not start without it.

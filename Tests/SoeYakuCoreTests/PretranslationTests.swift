@@ -66,6 +66,15 @@ private actor ProgressLog {
     func add(_ value: TranslationProgress) { values.append(value) }
 }
 
+private actor RunLog {
+    enum Event: Equatable {
+        case translated(Int, String)
+        case progress(TranslationProgress)
+    }
+    private(set) var events: [Event] = []
+    func add(_ event: Event) { events.append(event) }
+}
+
 private func document(_ texts: [String], paragraphs: [Int]? = nil, title: String = "Title") -> SourceDocument {
     SourceDocument(fingerprint: "f", title: title, sentences: texts.enumerated().map { index, text in
         Sentence(id: index, paragraph: paragraphs?[index] ?? 0, page: 0, text: text)
@@ -127,6 +136,29 @@ struct PretranslationTests {
         ])
         let history = await translator.recorder.calls[2].history
         #expect(history == [.init(source: "A.", translation: "訳:A.")])
+    }
+
+    @Test func reportsEachSentenceTranslationBeforeItsProgressIncludingSavedOnesButNotFailures() async throws {
+        defer { cleanUp() }
+        var memory = TranslationMemory()
+        memory[TranslationMemory.key(source: "A.", terms: [], model: "m")] = "保存済み"
+        try memory.save(to: memoryURL)
+        let job = pretranslation(["A.", "B.", "C."])
+        var translator = FakeTranslator()
+        translator.behavior = { source, _ in
+            if source == "B." { throw Failure(label: "B") }
+            return "訳:" + source
+        }
+        let log = RunLog()
+        let result = try await job.run(using: translator,
+                                       progress: { await log.add(.progress($0)) },
+                                       translated: { await log.add(.translated($0, $1)) })
+        #expect(result == ["保存済み", nil, "訳:C."])
+        #expect(await log.events == [
+            .translated(0, "保存済み"), .progress(TranslationProgress(done: 1, failed: 0, total: 3)),
+            .progress(TranslationProgress(done: 1, failed: 1, total: 3)),
+            .translated(2, "訳:C."), .progress(TranslationProgress(done: 2, failed: 1, total: 3))
+        ])
     }
 
     @Test func threeConsecutiveFailuresThrowTheLastErrorAfterSavingEarlierTranslations() async throws {

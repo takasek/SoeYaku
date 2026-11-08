@@ -1,5 +1,6 @@
 import AppKit
 import SoeYakuCore
+import Synchronization
 import Testing
 @testable import SoeYakuApp
 
@@ -69,6 +70,42 @@ import Testing
         reader.shutdown()
     }
 
+    @Test func aReportedTranslationReplacesOnlyItsSentence() async throws {
+        let loader = DocumentLoader()
+        let reader = reader(loader)
+        let pdf = URL(filePath: "/tmp/document.pdf")
+        reader.open(pdf)
+        let task = try #require(reader.loadingTask)
+        await loader.waitUntilStarted(pdf)
+        await loader.finish(pdf)
+        await task.value
+        #expect(reader.translations == [nil])
+        reader.record("訳", at: 0)
+        reader.record("範囲外", at: 1)
+        #expect(reader.translations == ["訳"])
+        reader.shutdown()
+    }
+
+    @Test func indexesEachDocumentOnceOffTheMainThreadAndReusesTheIndexWhenReopened() async throws {
+        _ = NSApplication.shared
+        let a = SourceDocument(fingerprint: "a-\(UUID().uuidString)", title: "a", sentences: [Sentence(id: 0, paragraph: 0, page: 0, text: "First.")])
+        let b = SourceDocument(fingerprint: "b-\(UUID().uuidString)", title: "b", sentences: [Sentence(id: 0, paragraph: 0, page: 0, text: "Second.")])
+        let log = IndexLog()
+        let reader = Reader(loadDocument: { $0.lastPathComponent == "b.pdf" ? b : a }, indexDocument: { document in
+            log.add(document.fingerprint, onMainThread: Thread.isMainThread)
+            return DocumentIndex(document)
+        })
+        reader.model = nil
+        for name in ["a.pdf", "a.pdf", "b.pdf"] {
+            reader.open(URL(filePath: "/tmp/\(name)"))
+            await reader.loadingTask?.value
+        }
+        #expect(reader.document == b)
+        #expect(log.calls.map(\.fingerprint) == [a.fingerprint, b.fingerprint])
+        #expect(log.calls.allSatisfy { !$0.onMainThread })
+        reader.shutdown()
+    }
+
     @Test func opensStaticHTMLThroughTheSharedDocumentLoaderAndChoosesBrowserFollowing() async throws {
         _ = NSApplication.shared
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("soeyaku-html-\(UUID().uuidString).html")
@@ -87,6 +124,12 @@ import Testing
         #expect(reader.translations == [nil, nil])
         reader.shutdown()
     }
+}
+
+private final class IndexLog: Sendable {
+    private let entries = Mutex<[(fingerprint: String, onMainThread: Bool)]>([])
+    var calls: [(fingerprint: String, onMainThread: Bool)] { entries.withLock { $0 } }
+    func add(_ fingerprint: String, onMainThread: Bool) { entries.withLock { $0.append((fingerprint, onMainThread)) } }
 }
 
 private actor DocumentLoader {
