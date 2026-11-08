@@ -103,7 +103,7 @@ enum FrameStyle {
     /// Serialized snapshots: a translated batch always remains paired with its captured image.
     func observe(region: FrameRegion, style: FrameStyle, engine: FrameTranslator) async throws {
         let id = revision
-        var lastImage: CFData?
+        var lastPixels: CapturedPixels?
         var lastBlocks: [FrameBlock]?
         var lastTranslations: [String] = []
         while revision == id {
@@ -111,8 +111,8 @@ enum FrameStyle {
             let image = try await capture(region)
             try Task.checkCancellation()
             guard revision == id else { return }
-            let data = image.dataProvider?.data
-            if let data, let lastImage, CFEqual(data, lastImage) {
+            let pixels = CapturedPixels(image)
+            if pixels.matches(lastPixels) {
                 try await Task.sleep(for: .milliseconds(600)); continue
             }
             let blocks = FrameText.blocks(from: try await recognize(image))
@@ -127,7 +127,7 @@ enum FrameStyle {
                 catch {
                     guard revision == id else { return }
                     report("この画面の翻訳に失敗しました。画面が変わると再試行します。 " + error.localizedDescription)
-                    lastImage = data; lastBlocks = nil; lastTranslations = []
+                    lastPixels = pixels; lastBlocks = nil; lastTranslations = []
                     try await Task.sleep(for: .milliseconds(600))
                     continue
                 }
@@ -137,7 +137,7 @@ enum FrameStyle {
             }
             present(image, blocks: blocks, translations: lastTranslations, style: style)
             report(blocks.isEmpty ? Self.emptyFrameMessage : "\(blocks.count) 段落を翻訳しました。画面が変わると更新します。")
-            lastImage = data; lastBlocks = blocks
+            lastPixels = pixels; lastBlocks = blocks
             try await Task.sleep(for: .milliseconds(600))
         }
     }
