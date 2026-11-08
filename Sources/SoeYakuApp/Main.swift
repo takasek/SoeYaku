@@ -29,11 +29,8 @@ import SwiftUI
         file.submenu?.addItem(withTitle: "PDF・HTML を開く…", action: #selector(openDocument), keyEquivalent: "o").target = self
         file.submenu?.addItem(withTitle: "URL を開く…", action: #selector(openURL), keyEquivalent: "u").target = self
         let edit = NSMenuItem()
-        edit.submenu = NSMenu(title: "編集")
+        edit.submenu = Self.makeEditMenu()
         menu.addItem(edit)
-        for (title, action, key) in [("コピー", "copy:", "c"), ("すべてを選択", "selectAll:", "a")] {
-            edit.submenu?.addItem(withTitle: title, action: Selector(action), keyEquivalent: key)
-        }
         let windows = NSMenuItem()
         let windowsMenu = NSMenu(title: "ウインドウ")
         windows.submenu = windowsMenu
@@ -62,6 +59,14 @@ import SwiftUI
         if let path = CommandLine.arguments.dropFirst().first(where: { ["pdf", "html", "htm", "xhtml"].contains(($0 as NSString).pathExtension.lowercased()) }) {
             reader.open(URL(filePath: path))
         }
+    }
+
+    static func makeEditMenu() -> NSMenu {
+        let menu = NSMenu(title: "編集")
+        for (title, action, key) in [("コピー", "copy:", "c"), ("すべてを選択", "selectAll:", "a")] {
+            menu.addItem(withTitle: title, action: Selector(action), keyEquivalent: key)
+        }
+        return menu
     }
 
     @objc private func openDocument() { reader.chooseDocument() }
