@@ -63,7 +63,7 @@ import SwiftUI
 
     static func makeEditMenu() -> NSMenu {
         let menu = NSMenu(title: "編集")
-        for (title, action, key) in [("コピー", "copy:", "c"), ("すべてを選択", "selectAll:", "a")] {
+        for (title, action, key) in [("コピー", "copy:", "c"), ("貼り付け", "paste:", "v"), ("すべてを選択", "selectAll:", "a")] {
             menu.addItem(withTitle: title, action: Selector(action), keyEquivalent: key)
         }
         return menu
