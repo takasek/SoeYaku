@@ -6,7 +6,7 @@ public struct Sentence: Codable, Sendable, Hashable, Identifiable {
     public let id: Int
     /// 0-based paragraph index; consecutive sentences with the same value form one paragraph.
     public let paragraph: Int
-    /// 0-based page on which the sentence starts.
+    /// 0-based PDF page on which the sentence starts; HTML uses 0.
     public let page: Int
     public let text: String
 
@@ -32,6 +32,6 @@ public struct SourceDocument: Codable, Sendable, Equatable {
     }
 
     public static func fingerprint(of data: Data) -> String {
-        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        SHA256.hash(data: data).lowercaseHex
     }
 }
