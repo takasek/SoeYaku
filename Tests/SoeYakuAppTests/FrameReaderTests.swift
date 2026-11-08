@@ -70,6 +70,28 @@ import Testing
     private func entered(_ gate: FrameGate) async {
         while !(await gate.entered) { await Task.yield() }
     }
+    @Test func anUnchangedCaptureIsNotRecognizedAgain() async throws {
+        _ = NSApplication.shared
+        let panel = TranslationPanel()
+        let image = try bitmap()
+        let recognitions = Tally()
+        var captures = 0
+        let reader = FrameReader(panel: panel, capture: { _ in captures += 1; return image }, recognize: { _ in
+            await recognitions.add()
+            return [TextLine(text: "Cross the bridge.", box: CGRect(x: 0.1, y: 0.1, width: 0.8, height: 0.1))]
+        })
+        let engine = FrameTranslator(using: GatedFrameTranslator(gate: nil), glossary: Glossary())
+        let work = Task { try await reader.observe(region: region, style: .text, engine: engine) }
+        // The third capture comes only after the second one has been handled.
+        let deadline = ContinuousClock.now + .seconds(3)
+        while ContinuousClock.now < deadline, captures < 3 {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        reader.stop()
+        do { try await work.value } catch is CancellationError { }
+        #expect(captures >= 3)
+        #expect(await recognitions.count == 1)
+    }
     private func footer(_ panel: TranslationPanel) -> String? {
         panel.window.contentView?.subviews.compactMap { $0 as? NSTextField }.first?.stringValue
     }
@@ -81,6 +103,11 @@ private struct FailingFrameTranslator: SentenceTranslator {
         if source == "Old dialogue." { throw Failure() }
         return "次の台詞。"
     }
+}
+
+private actor Tally {
+    private(set) var count = 0
+    func add() { count += 1 }
 }
 
 private actor FrameGate {
